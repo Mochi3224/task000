@@ -164,9 +164,9 @@
             0: { id: 0, name: '空気', solid: false },
             1: { id: 1, name: '草ブロック', color: '#4CAF50', type: 'block', drop: 1 }, // 草ドロップ
             2: { id: 2, name: '土', color: '#795548', type: 'block', drop: 2 },
-            3: { id: 3, name: '石', color: '#9E9E9E', type: 'block', drop: 3 },
+            3: { id: 3, name: '石', color: '#9E9E9E', type: 'block', drop: 3, reqTool: 'wood_pick' },
             4: { id: 4, name: '原木', color: '#5D4037', type: 'block', drop: 4 },
-            5: { id: 5, name: '葉', color: '#2E7D32', type: 'block', drop: null },
+            5: { id: 5, name: '葉', color: '#2E7D32', type: 'block', drop: null, solid: false },
             6: { id: 6, name: '砂', color: '#FDD835', type: 'block', drop: 6 },
             7: { id: 7, name: '水', color: '#1E88E5', solid: false, liquid: true, type: 'block' },
             8: { id: 8, name: '鉄鉱石', color: '#BCAAA4', type: 'block', drop: 8, reqTool: 'stone_pick' },
@@ -175,7 +175,7 @@
             11: { id: 11, name: '木材', color: '#D7CCC8', type: 'block', drop: 11 },
             12: { id: 12, name: '石炭鉱石', color: '#424242', type: 'block', drop: 13, reqTool: 'wood_pick' },
             13: { id: 13, name: '石炭', color: '#212121', type: 'item' },
-            14: { id: 14, name: '松明', color: '#FFEB3B', type: 'block', drop: 14, solid: false, light: 10 },
+            14: { id: 14, name: '松明', color: '#FFEB3B', type: 'block', drop: 14, solid: false, light: 12 },
             15: { id: 15, name: 'ハシゴ', color: '#8D6E63', type: 'block', drop: 15, solid: false, climbable: true },
             16: { id: 16, name: 'ガラス', color: '#E0F7FA', type: 'block', drop: null }, // 村用
             
@@ -236,6 +236,85 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // --- ピクセルアートテクスチャの自動生成 ---
+        const textures = {};
+        function initTextures() {
+            Object.values(ITEMS).forEach(item => {
+                let c = document.createElement('canvas');
+                c.width = 16; c.height = 16;
+                let ctxT = c.getContext('2d');
+                ctxT.fillStyle = item.color || '#000';
+                
+                // 基本的なブロックのノイズ（ザラザラ感）
+                if(item.type === 'block' && item.id !== 0 && !item.liquid) {
+                    ctxT.fillRect(0,0,16,16);
+                    for(let i=0; i<40; i++) {
+                        ctxT.fillStyle = Math.random()>0.5 ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+                        ctxT.fillRect(Math.floor(Math.random()*16), Math.floor(Math.random()*16), 1, 1);
+                    }
+                    ctxT.strokeStyle = 'rgba(0,0,0,0.4)'; ctxT.strokeRect(0,0,16,16);
+                }
+
+                // アイテムごとの専用ドット絵描画
+                if(item.id === 1) { // 草ブロック
+                    ctxT.fillStyle = '#795548'; ctxT.fillRect(0,4,16,12); // 下の土
+                    ctxT.fillStyle = '#4CAF50'; ctxT.fillRect(0,0,16,4); // 上の草
+                    for(let i=0; i<6; i++) { ctxT.fillRect(Math.random()*16, 4, 1, Math.random()*3); } // 垂れる草
+                } else if(item.id === 3 || item.id === 8 || item.id === 9 || item.id === 12) { // 丸石・鉱石
+                    ctxT.fillStyle = '#757575'; ctxT.fillRect(0,0,16,16);
+                    ctxT.fillStyle = '#616161'; ctxT.fillRect(0,0,16,2); ctxT.fillRect(0,0,2,16);
+                    ctxT.fillStyle = '#9E9E9E'; ctxT.fillRect(14,0,2,16); ctxT.fillRect(0,14,16,2);
+                    if(item.id !== 3) {
+                        ctxT.fillStyle = item.id===8?'#FFCC80':(item.id===9?'#00BCD4':'#212121');
+                        ctxT.fillRect(4,4,3,3); ctxT.fillRect(10,8,3,3); ctxT.fillRect(6,12,3,3); // 鉱石の粒
+                    }
+                } else if(item.id === 4) { // 原木
+                    ctxT.fillStyle = '#5D4037'; ctxT.fillRect(0,0,16,16);
+                    ctxT.fillStyle = '#3E2723'; ctxT.fillRect(3,0,2,16); ctxT.fillRect(10,0,2,16); // 木目
+                } else if(item.id === 5) { // 葉（透過）
+                    ctxT.clearRect(0,0,16,16);
+                    for(let y=0;y<16;y+=2) for(let x=0;x<16;x+=2) {
+                        if(Math.random()>0.3) { ctxT.fillStyle = Math.random()>0.5?'#2E7D32':'#1B5E20'; ctxT.fillRect(x,y,2,2); }
+                    }
+                } else if(item.id === 10) { // ベッド
+                    ctxT.fillStyle = '#D7CCC8'; ctxT.fillRect(0,10,16,6); // 木の土台
+                    ctxT.fillStyle = '#E53935'; ctxT.fillRect(0,6,10,4); // 赤い布団
+                    ctxT.fillStyle = '#FFF'; ctxT.fillRect(10,6,6,4); // 枕
+                } else if(item.id === 11) { // 木材
+                    ctxT.fillStyle = '#D7CCC8'; ctxT.fillRect(0,0,16,16);
+                    ctxT.fillStyle = '#BCAAA4'; ctxT.fillRect(0,4,16,1); ctxT.fillRect(0,10,16,1); // 板の線
+                } else if(item.id === 14) { // 松明
+                    ctxT.clearRect(0,0,16,16);
+                    ctxT.fillStyle = '#795548'; ctxT.fillRect(6,8,4,8);
+                    ctxT.fillStyle = '#FFEB3B'; ctxT.fillRect(6,4,4,4);
+                    ctxT.fillStyle = '#FF9800'; ctxT.fillRect(7,5,2,2);
+                } else if(item.id === 15) { // ハシゴ
+                    ctxT.clearRect(0,0,16,16);
+                    ctxT.fillStyle = '#8D6E63'; ctxT.fillRect(2,0,2,16); ctxT.fillRect(12,0,2,16);
+                    for(let i=2; i<16; i+=4) ctxT.fillRect(4,i,8,2);
+                } else if(item.type === 'tool') { // ツール類（ツルハシ・剣・斧）
+                    ctxT.clearRect(0,0,16,16);
+                    ctxT.fillStyle = '#8D6E63'; 
+                    for(let i=0;i<6;i++) ctxT.fillRect(i*2, 14-i*2, 2, 2); // 持ち手
+                    ctxT.fillStyle = item.id>=29?'#84FFFF':(item.id>=24&&item.id!=31?'#9E9E9E':'#A1887F'); 
+                    if(item.toolType === 'pick') { ctxT.fillRect(6,2,8,2); ctxT.fillRect(12,2,2,6); ctxT.fillRect(10,0,2,2); }
+                    else if(item.toolType === 'axe') { ctxT.fillRect(8,2,6,6); ctxT.fillRect(14,4,2,2); }
+                    else if(item.toolType === 'sword') { ctxT.fillRect(8,0,8,8); }
+                } else if(item.id === 7) { // 水
+                    ctxT.fillStyle = 'rgba(30, 136, 229, 0.6)'; ctxT.fillRect(0,0,16,16);
+                    ctxT.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctxT.fillRect(0,2,16,2);
+                } else if(!item.liquid && item.id !== 0) {
+                    // その他のアイテム
+                    if(item.type === 'item') {
+                        ctxT.clearRect(0,0,16,16);
+                        ctxT.fillStyle = item.color; ctxT.fillRect(4,4,8,8);
+                    }
+                }
+                textures[item.id] = c;
+            });
+        }
+        initTextures(); // ゲーム開始時にテクスチャを生成
+
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', resize);
         resize();
@@ -268,10 +347,11 @@
                     } else {
                         block = 3; // Stone
                         
-                        // Caves (Simple random noise thresholding)
-                        if (y > terrainH + 5) {
-                            let caveNoise = Math.sin(x*0.2)*Math.cos(y*0.2) + Math.random();
-                            if(caveNoise > 1.2) block = 0; // Air (Cave)
+                        // Caves (パーリンノイズ風の連結した洞窟生成)
+                        if (y > terrainH + 4) {
+                            let caveNoise1 = Math.sin(x*0.15)*Math.cos(y*0.15);
+                            let caveNoise2 = Math.sin(x*0.1 + 10)*Math.cos(y*0.1 + 10);
+                            if(caveNoise1 + caveNoise2 > 0.6) block = 0; // 空洞にする
                         }
 
                         // Ores
@@ -803,9 +883,18 @@
             ctx.fillStyle = skyColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // 夜の暗闇レイヤー
             if(nightAlpha > 0) {
-                ctx.fillStyle = `rgba(10, 10, 20, ${nightAlpha * 0.5})`; // darken sky
+                ctx.fillStyle = `rgba(10, 10, 20, ${nightAlpha * 0.6})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 星の描画
+            if (nightAlpha > 0.3) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${nightAlpha - 0.3})`;
+                for(let i=0; i<50; i++) {
+                    ctx.fillRect((i*123)%canvas.width, (i*321)%(canvas.height/2), 2, 2);
+                }
             }
 
             ctx.save();
@@ -816,40 +905,17 @@
             let startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
             let endRow = Math.min(WORLD_ROWS, startRow + Math.ceil(canvas.height / TILE_SIZE) + 1);
 
-            // Draw Blocks
+            // Draw Blocks (テクスチャを使って描画)
             for (let y = startRow; y < endRow; y++) {
                 for (let x = startCol; x < endCol; x++) {
                     let bId = world[y][x];
                     if (bId !== 0) {
-                        let item = ITEMS[bId];
-                        ctx.fillStyle = item.color;
-                        
                         let bx = x * TILE_SIZE, by = y * TILE_SIZE;
-
-                        if (item.liquid) {
-                            ctx.globalAlpha = 0.7;
-                            ctx.fillRect(bx, by + 4, TILE_SIZE, TILE_SIZE - 4);
-                            ctx.globalAlpha = 1.0;
-                        } else if (bId === 14) { // Torch
-                            ctx.fillRect(bx + TILE_SIZE/2 - 2, by + TILE_SIZE/2, 4, TILE_SIZE/2); // stick
-                            ctx.fillStyle = '#FF5722'; ctx.fillRect(bx + TILE_SIZE/2 - 3, by + TILE_SIZE/2 - 4, 6, 4); // flame
-                        } else if (bId === 15) { // Ladder
-                            ctx.strokeStyle = item.color; ctx.lineWidth = 2;
-                            ctx.beginPath(); ctx.moveTo(bx+4, by); ctx.lineTo(bx+4, by+TILE_SIZE);
-                            ctx.moveTo(bx+TILE_SIZE-4, by); ctx.lineTo(bx+TILE_SIZE-4, by+TILE_SIZE);
-                            for(let i=4; i<TILE_SIZE; i+=6) { ctx.moveTo(bx+4, by+i); ctx.lineTo(bx+TILE_SIZE-4, by+i); }
-                            ctx.stroke(); ctx.lineWidth = 1;
+                        if(textures[bId]) {
+                            ctx.drawImage(textures[bId], bx, by, TILE_SIZE, TILE_SIZE);
                         } else {
+                            ctx.fillStyle = ITEMS[bId].color;
                             ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
-                            // Texture details
-                            if (bId === 1) { ctx.fillStyle = '#2E7D32'; ctx.fillRect(bx, by, TILE_SIZE, 6); } // Grass
-                            else if (bId === 4) { ctx.fillStyle = '#3E2723'; ctx.fillRect(bx+4, by, TILE_SIZE-8, TILE_SIZE); } // Log
-                            else if (bId === 8 || bId === 9 || bId === 12) { 
-                                ctx.fillStyle = bId===8 ? '#FFF' : (bId===9 ? '#E0F7FA' : '#000');
-                                ctx.fillRect(bx+4, by+4, 4, 4); ctx.fillRect(bx+14, by+12, 4, 4); ctx.fillRect(bx+6, by+16, 4, 4);
-                            }
-                            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-                            ctx.strokeRect(bx, by, TILE_SIZE, TILE_SIZE);
                         }
                     }
                 }
@@ -879,51 +945,55 @@
                 if (player.facingRight) ctx.fillRect(player.x + 8, player.y, 2, 2);
                 else ctx.fillRect(player.x + 6, player.y, 2, 2);
 
+                // 手持ちアイテム（テクスチャ反映）
                 let heldItem = inventory[hotbarSelection];
                 if(heldItem && ITEMS[heldItem.id]) {
-                    ctx.fillStyle = ITEMS[heldItem.id].color;
-                    let hx = player.facingRight ? player.x + player.w : player.x - 8;
-                    ctx.fillRect(hx, player.y + 10, 8, 8);
-                }
-            }
-
-            // --- Lighting Layer ---
-            // Create a dark overlay and "punch holes" where light is
-            // Basic approach: Draw black rect over screen, then use destination-out to clear circles around lights
-            
-            ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.2, nightAlpha)})`; // Base darkness
-            // If deep underground, make it darker
-            let depth = (camera.y + canvas.height/2) / TILE_SIZE;
-            if(depth > 40) ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.95, 0.4 + (depth-40)*0.02)})`;
-
-            // Draw dark layer
-            ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
-
-            ctx.globalCompositeOperation = 'destination-out';
-            
-            // Function to punch light hole
-            const drawLight = (cx, cy, radius, intensity = 1) => {
-                let grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-                grd.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
-                grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                ctx.fillStyle = grd;
-                ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI*2); ctx.fill();
-            };
-
-            // Player Light (small)
-            if(!player.dead) drawLight(player.x + player.w/2, player.y + player.h/2, TILE_SIZE * 4, 0.6);
-
-            // Block Lights (Torches)
-            for (let y = startRow; y < endRow; y++) {
-                for (let x = startCol; x < endCol; x++) {
-                    let bId = world[y][x];
-                    if (bId !== 0 && ITEMS[bId].light) {
-                        drawLight(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2, ITEMS[bId].light * TILE_SIZE, 0.9);
+                    let hx = player.facingRight ? player.x + player.w : player.x - 12;
+                    if(textures[heldItem.id]) {
+                        ctx.drawImage(textures[heldItem.id], hx, player.y + 6, 16, 16);
+                    } else {
+                        ctx.fillStyle = ITEMS[heldItem.id].color;
+                        ctx.fillRect(hx, player.y + 10, 8, 8);
                     }
                 }
             }
 
-            ctx.globalCompositeOperation = 'source-over'; // Reset
+            // --- Lighting Layer (光源システム) ---
+            let depth = (camera.y + canvas.height/2) / TILE_SIZE;
+            // 地下に行くほど暗くなる
+            let undergroundDarkness = Math.max(0, Math.min(0.96, (depth - 30) * 0.05));
+            let finalDarkness = Math.max(nightAlpha * 0.9, undergroundDarkness);
+
+            // 周囲が暗い場合のみ光源処理を実行
+            if (finalDarkness > 0.1) {
+                ctx.fillStyle = `rgba(5, 5, 10, ${finalDarkness})`; 
+                ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
+
+                ctx.globalCompositeOperation = 'destination-out'; // 暗闇をくり抜く
+                
+                const drawLight = (cx, cy, radius, intensity = 1) => {
+                    let grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                    grd.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+                    grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = grd;
+                    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI*2); ctx.fill();
+                };
+
+                // Player Ambient Light (自分自身がかすかに光ることで周りが見える)
+                if(!player.dead) drawLight(player.x + player.w/2, player.y + player.h/2, TILE_SIZE * 6, 0.5);
+
+                // Block Lights (Torches)
+                for (let y = startRow; y < endRow; y++) {
+                    for (let x = startCol; x < endCol; x++) {
+                        let bId = world[y][x];
+                        if (bId !== 0 && ITEMS[bId].light) {
+                            let flicker = Math.random() * 8 - 4; // 松明の揺らめき
+                            drawLight(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2, ITEMS[bId].light * TILE_SIZE + flicker, 1.0);
+                        }
+                    }
+                }
+                ctx.globalCompositeOperation = 'source-over'; // 元に戻す
+            }
 
             // Highlight Target
             if (!player.dead && document.getElementById('inventoryModal').style.display !== 'flex') {
@@ -971,7 +1041,10 @@
                 let item = inventory[i];
                 if(item && ITEMS[item.id]) {
                     let def = ITEMS[item.id];
-                    slot.innerHTML = `<div class="slot-img" style="background-color: ${def.color};"></div>
+                    let tCanvas = textures[item.id];
+                    let imgSrc = tCanvas ? tCanvas.toDataURL() : '';
+                    
+                    slot.innerHTML = `<img src="${imgSrc}" class="slot-img" style="image-rendering: pixelated; width: 32px; height: 32px;">
                                       ${item.count > 1 || gameMode === 'creative' ? `<span class="slot-count">${gameMode === 'creative' ? '∞' : item.count}</span>` : ''}`;
                     slot.title = def.name;
                 }
@@ -984,9 +1057,11 @@
                 inventory.forEach(item => {
                     let def = ITEMS[item.id];
                     if(!def) return;
+                    let tCanvas = textures[item.id];
+                    let imgSrc = tCanvas ? tCanvas.toDataURL() : '';
                     let div = document.createElement('div');
                     div.className = 'w-14 h-14 bg-gray-700 rounded flex flex-col items-center justify-center relative shadow-inner border border-gray-600 cursor-pointer hover:bg-gray-600';
-                    div.innerHTML = `<div class="w-8 h-8 rounded-sm" style="background-color: ${def.color};"></div>
+                    div.innerHTML = `<img src="${imgSrc}" class="w-8 h-8 rounded-sm" style="image-rendering: pixelated;">
                                      <span class="text-[10px] text-gray-300 mt-1 truncate w-full text-center px-1">${def.name}</span>
                                      ${item.count > 1 || gameMode === 'creative' ? `<span class="absolute top-1 right-1 text-xs font-bold">${gameMode === 'creative' ? '∞' : item.count}</span>` : ''}`;
                     invGrid.appendChild(div);
