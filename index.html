@@ -1,124 +1,129 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D WebCraft</title>
+    <title>2D WebCraft 日本語版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #111; color: white; font-family: 'Inter', sans-serif; user-select: none; }
-        #gameCanvas {
-            image-rendering: pixelated;
-            cursor: crosshair;
-            display: block;
-        }
+        #gameCanvas { image-rendering: pixelated; cursor: crosshair; display: block; }
         .ui-layer { position: absolute; pointer-events: none; }
         .pointer-events-auto { pointer-events: auto; }
         
-        /* Health Bar */
-        #healthBarContainer { width: 300px; height: 20px; background: #333; border: 2px solid #000; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); border-radius: 10px; overflow: hidden; z-index: 10; }
+        /* Health & Food Bar */
+        .status-bar-container { width: 150px; height: 16px; background: #333; border: 2px solid #000; border-radius: 8px; overflow: hidden; position: relative; }
         #healthBar { height: 100%; background: #E53935; width: 100%; transition: width 0.2s; }
-        
+        #foodBar { height: 100%; background: #FB8C00; width: 100%; transition: width 0.2s; }
+
         /* Hotbar */
         #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 8px; z-index: 10; pointer-events: auto;}
-        .hotbar-slot { width: 40px; height: 40px; background: rgba(255,255,255,0.2); border: 2px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; transition: 0.1s;}
-        .hotbar-slot.selected { border-color: #FFF; transform: scale(1.1); background: rgba(255,255,255,0.4); }
-        .slot-count { position: absolute; bottom: 2px; right: 4px; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 0 #000; }
-        .slot-img { width: 24px; height: 24px; }
+        .hotbar-slot { width: 44px; height: 44px; background: rgba(255,255,255,0.2); border: 2px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; transition: 0.1s;}
+        .hotbar-slot.selected { border-color: #FFF; transform: scale(1.1); background: rgba(255,255,255,0.4); box-shadow: 0 0 10px rgba(255,255,255,0.5);}
+        .slot-count { position: absolute; bottom: 2px; right: 4px; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 0 #000; }
+        .slot-img { width: 28px; height: 28px; border-radius: 2px;}
 
         /* Inventory & Crafting Modal */
-        #inventoryModal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(30,30,40,0.95); border: 4px solid #555; border-radius: 12px; padding: 20px; display: none; z-index: 20; width: 600px; pointer-events: auto; flex-direction: row; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .inv-section { flex: 1; display: flex; flex-direction: column; }
-        .inv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; overflow-y: auto; max-height: 300px;}
-        .craft-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 300px; padding-right: 5px;}
+        #inventoryModal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(30,30,40,0.95); border: 4px solid #555; border-radius: 12px; padding: 20px; display: none; z-index: 20; width: 700px; max-height: 80vh; pointer-events: auto; flex-direction: row; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .inv-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; overflow-y: auto; padding-right: 5px; }
+        .craft-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 5px; }
         .craft-btn { background: #4CAF50; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; text-align: left; font-size: 14px; transition: 0.2s;}
         .craft-btn:hover:not(:disabled) { background: #45a049; }
         .craft-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
-        #deathScreen { z-index: 50; }
-        #timeOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; transition: background-color 1s; }
-        
-        .block-icon { width: 100%; height: 100%; border-radius: 2px; }
+        /* Generic screens */
+        .overlay-screen { position: absolute; inset: 0; display: flex; flex-col items-center; justify-content: center; z-index: 50; flex-direction: column; }
+        .btn-main { background: #4CAF50; color: white; padding: 12px 24px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; border: 2px solid #388E3C; transition: 0.2s; text-align: center; width: 250px;}
+        .btn-main:hover { background: #66BB6A; transform: scale(1.05); }
+        .btn-alt { background: #2196F3; border-color: #1976D2; }
+        .btn-alt:hover { background: #42A5F5; }
     </style>
 </head>
 <body class="flex flex-col h-screen items-center justify-center">
 
     <!-- Login UI -->
-    <div id="loginUI" class="flex flex-col items-center justify-center space-y-6 bg-gray-800 p-10 rounded-xl shadow-2xl z-50 absolute">
-        <h1 class="text-4xl font-bold text-green-400 mb-2">2D WebCraft: Survival</h1>
-        <p class="text-gray-300">Sign in to start surviving and save your world.</p>
+    <div id="loginUI" class="overlay-screen bg-gray-900">
+        <h1 class="text-5xl font-bold text-green-400 mb-4 drop-shadow-lg">2D WebCraft</h1>
+        <p class="text-gray-300 mb-8">Googleアカウントでログインして世界を保存しよう</p>
         <button id="loginBtn" class="flex items-center gap-2 bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow">
-            <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/><path fill="none" d="M1 1h22v22H1z"/></svg>
-            Sign in with Google
+            Googleでサインイン
         </button>
-        <div id="loginError" class="text-red-400 text-sm hidden text-center max-w-xs"></div>
+        <div id="loginError" class="text-red-400 text-sm hidden text-center max-w-xs mt-4"></div>
+    </div>
+
+    <!-- Title / Mode Select UI -->
+    <div id="titleUI" class="overlay-screen bg-gray-800 hidden" style="background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://placehold.co/800x600/2E7D32/ffffff?text=Minecraft+Background'); background-size: cover;">
+        <h1 class="text-6xl font-bold text-white mb-10 text-shadow-md border-b-4 border-green-500 pb-2">2D WebCraft</h1>
+        <div class="flex flex-col gap-4">
+            <button id="btnNewSurvival" class="btn-main">新規作成 (サバイバル)</button>
+            <button id="btnNewCreative" class="btn-main">新規作成 (クリエイティブ)</button>
+            <button id="btnLoadGame" class="btn-main btn-alt mt-4">ワールドをロード</button>
+        </div>
+        <div class="mt-8 text-gray-400 text-sm">操作: [WASD]=移動 [左クリック]=置く/攻撃 [右クリック]=掘る/寝る [E]=インベントリ [F]=食べる</div>
     </div>
 
     <!-- Game Container -->
     <div id="gameUI" class="hidden relative w-full h-full bg-blue-300 overflow-hidden">
         
-        <!-- Day/Night Overlay -->
-        <div id="timeOverlay"></div>
-
         <canvas id="gameCanvas"></canvas>
 
         <!-- UI Layer -->
         <div class="ui-layer inset-0 flex flex-col pointer-events-none z-10">
-            <!-- Top Bar -->
-            <div class="flex justify-between items-center w-full p-4 pointer-events-auto">
-                <div class="flex items-center gap-3 bg-gray-800 bg-opacity-70 p-2 rounded-lg">
-                    <img id="userAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full hidden">
-                    <span id="userName" class="font-medium text-gray-200"></span>
-                    <button id="logoutBtn" class="text-red-400 hover:text-red-300 text-xs ml-2 underline">Logout</button>
+            <!-- Top Status Bar -->
+            <div class="flex justify-between items-start w-full p-4 pointer-events-auto">
+                <div class="flex flex-col gap-2 bg-gray-800 bg-opacity-70 p-3 rounded-lg">
+                    <!-- HP -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-red-400 text-sm font-bold">HP</span>
+                        <div class="status-bar-container"><div id="healthBar"></div></div>
+                    </div>
+                    <!-- Food -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-orange-400 text-sm font-bold">満腹</span>
+                        <div class="status-bar-container"><div id="foodBar"></div></div>
+                    </div>
+                    <!-- Info -->
+                    <div class="text-white text-xs mt-1" id="modeDisplay">Mode: Survival</div>
                 </div>
+                
                 <div class="flex flex-col items-end gap-2">
                     <div class="flex gap-2">
-                        <button id="saveBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium transition text-sm shadow">Save</button>
-                        <button id="loadBtn" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-medium transition text-sm shadow">Load</button>
+                        <button id="saveBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium transition text-sm shadow">セーブ</button>
+                        <button id="exitBtn" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-medium transition text-sm shadow">タイトルへ</button>
                     </div>
-                    <div id="statusMessage" class="text-yellow-300 text-sm font-mono h-5 drop-shadow-md"></div>
+                    <div id="statusMessage" class="text-yellow-300 text-sm font-bold drop-shadow-md h-5"></div>
                 </div>
             </div>
 
-            <!-- Health Bar -->
-            <div id="healthBarContainer"><div id="healthBar"></div></div>
-
             <!-- Controls Helper -->
-            <div class="absolute top-20 left-4 text-white text-xs drop-shadow-md bg-black bg-opacity-50 p-2 rounded">
-                [W/A/S/D] Move & Jump<br>
-                [Left Click] Attack / Mine / Place<br>
-                [Right Click] Place / Sleep<br>
-                [E] Inventory & Crafting<br>
-                [1-9] Select Item
+            <div class="absolute top-24 left-4 text-white text-xs drop-shadow-md bg-black bg-opacity-60 p-2 rounded">
+                [L] 掘る / [K] 置く<br>
+                [Q] アイテムを捨てる<br>
+                [F] 食べ物を食べる
             </div>
         </div>
 
         <!-- Hotbar -->
-        <div id="hotbar">
-            <!-- Generated via JS -->
-        </div>
+        <div id="hotbar"></div>
 
         <!-- Inventory / Crafting Modal -->
         <div id="inventoryModal">
             <div class="inv-section">
-                <h2 class="text-xl font-bold text-white mb-4 border-b border-gray-600 pb-2">Inventory</h2>
-                <div id="invGrid" class="inv-grid">
-                    <!-- Items go here -->
-                </div>
+                <h2 class="text-xl font-bold text-white mb-4 border-b border-gray-600 pb-2">インベントリ</h2>
+                <div id="invGrid" class="inv-grid"></div>
             </div>
             <div class="inv-section">
-                <h2 class="text-xl font-bold text-white mb-4 border-b border-gray-600 pb-2">Crafting</h2>
-                <div id="craftList" class="craft-list">
-                    <!-- Recipes go here -->
-                </div>
+                <h2 class="text-xl font-bold text-white mb-4 border-b border-gray-600 pb-2">クラフト</h2>
+                <div id="craftList" class="craft-list"></div>
             </div>
-            <button id="closeInvBtn" class="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+            <button id="closeInvBtn" class="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-2xl">&times;</button>
         </div>
 
         <!-- Death Screen -->
-        <div id="deathScreen" class="hidden absolute inset-0 bg-red-900 bg-opacity-90 flex flex-col items-center justify-center text-white text-6xl font-bold pointer-events-none transition-opacity">
+        <div id="deathScreen" class="hidden absolute inset-0 bg-red-900 bg-opacity-90 flex flex-col items-center justify-center text-white text-6xl font-bold pointer-events-none transition-opacity z-50">
             YOU DIED
-            <span class="text-xl mt-4 text-gray-300">Respawning...</span>
+            <span class="text-xl mt-4 text-gray-300">リスポーン中...</span>
         </div>
     </div>
 
@@ -128,7 +133,7 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDBqw6kx_1fMunXjmC79OfEPrtEwbk6CGM",
             authDomain: "task000.firebaseapp.com",
             projectId: "task000",
@@ -136,7 +141,7 @@
             messagingSenderId: "776947135197",
             appId: "1:776947135197:web:11a0daad931efbfe41a134"
         };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : '2d-minecraft-survival';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : '2d-webcraft-jp';
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -145,109 +150,105 @@
         let currentUser = null;
 
         // --- Game Data & Definitions ---
-        const TILE_SIZE = 20;
-        const WORLD_COLS = 200;
-        const WORLD_ROWS = 60;
+        const TILE_SIZE = 24;
+        const WORLD_COLS = 300;
+        const WORLD_ROWS = 100;
         
-        // Time constants (60fps)
         const FPS = 60;
         const DAY_FRAMES = 7 * 60 * FPS; // 7 mins
         const NIGHT_FRAMES = 3 * 60 * FPS; // 3 mins
         const TOTAL_DAY_CYCLE = DAY_FRAMES + NIGHT_FRAMES;
 
-        // Dictionary of blocks and items
+        // 日本語化・アイテム拡充
         const ITEMS = {
-            0: { id: 0, name: 'Air', solid: false },
-            1: { id: 1, name: 'Grass', color: '#4CAF50', type: 'block', drop: 1 },
-            2: { id: 2, name: 'Dirt', color: '#795548', type: 'block', drop: 2 },
-            3: { id: 3, name: 'Stone', color: '#9E9E9E', type: 'block', drop: 3 }, // drops stone/cobble
-            4: { id: 4, name: 'Wood Log', color: '#5D4037', type: 'block', drop: 4 },
-            5: { id: 5, name: 'Leaves', color: '#2E7D32', type: 'block', drop: null },
-            6: { id: 6, name: 'Sand', color: '#FDD835', type: 'block', drop: 6 },
-            7: { id: 7, name: 'Water', color: '#1E88E5', solid: false, liquid: true, type: 'block' },
-            8: { id: 8, name: 'Iron Ore', color: '#BCAAA4', type: 'block', drop: 8, reqTool: 'stone_pick' },
-            9: { id: 9, name: 'Diamond Ore', color: '#00BCD4', type: 'block', drop: 9, reqTool: 'stone_pick' },
-            10: { id: 10, name: 'Bed', color: '#E53935', type: 'block', drop: 10 },
-            11: { id: 11, name: 'Planks', color: '#D7CCC8', type: 'block', drop: 11 },
+            0: { id: 0, name: '空気', solid: false },
+            1: { id: 1, name: '草ブロック', color: '#4CAF50', type: 'block', drop: 1 }, // 草ドロップ
+            2: { id: 2, name: '土', color: '#795548', type: 'block', drop: 2 },
+            3: { id: 3, name: '石', color: '#9E9E9E', type: 'block', drop: 3 },
+            4: { id: 4, name: '原木', color: '#5D4037', type: 'block', drop: 4 },
+            5: { id: 5, name: '葉', color: '#2E7D32', type: 'block', drop: null },
+            6: { id: 6, name: '砂', color: '#FDD835', type: 'block', drop: 6 },
+            7: { id: 7, name: '水', color: '#1E88E5', solid: false, liquid: true, type: 'block' },
+            8: { id: 8, name: '鉄鉱石', color: '#BCAAA4', type: 'block', drop: 8, reqTool: 'stone_pick' },
+            9: { id: 9, name: 'ダイヤ鉱石', color: '#00BCD4', type: 'block', drop: 9, reqTool: 'iron_pick' },
+            10: { id: 10, name: 'ベッド', color: '#E53935', type: 'block', drop: 10 },
+            11: { id: 11, name: '木材', color: '#D7CCC8', type: 'block', drop: 11 },
+            12: { id: 12, name: '石炭鉱石', color: '#424242', type: 'block', drop: 13, reqTool: 'wood_pick' },
+            13: { id: 13, name: '石炭', color: '#212121', type: 'item' },
+            14: { id: 14, name: '松明', color: '#FFEB3B', type: 'block', drop: 14, solid: false, light: 10 },
+            15: { id: 15, name: 'ハシゴ', color: '#8D6E63', type: 'block', drop: 15, solid: false, climbable: true },
+            16: { id: 16, name: 'ガラス', color: '#E0F7FA', type: 'block', drop: null }, // 村用
             
             // Items & Tools
-            20: { id: 20, name: 'Stick', color: '#8D6E63', type: 'item' },
-            21: { id: 21, name: 'Wood Pickaxe', color: '#A1887F', type: 'tool', toolType: 'pick', tier: 1, dmg: 2 },
-            22: { id: 22, name: 'Stone Pickaxe', color: '#757575', type: 'tool', toolType: 'pick', tier: 2, dmg: 3 },
-            23: { id: 23, name: 'Wood Axe', color: '#A1887F', type: 'tool', toolType: 'axe', tier: 1, dmg: 3 },
-            24: { id: 24, name: 'Sword', color: '#9E9E9E', type: 'tool', toolType: 'sword', tier: 2, dmg: 6 },
-            25: { id: 25, name: 'Pork', color: '#F48FB1', type: 'item' },
-            26: { id: 26, name: 'Wool', color: '#EEEEEE', type: 'item' },
-            27: { id: 27, name: 'Beef', color: '#D32F2F', type: 'item' },
-            28: { id: 28, name: 'Chicken Meat', color: '#FFCC80', type: 'item' },
-            29: { id: 29, name: 'Iron Pickaxe', color: '#E0E0E0', type: 'tool', toolType: 'pick', tier: 3, dmg: 5 },
-            30: { id: 30, name: 'Diamond Pickaxe', color: '#84FFFF', type: 'tool', toolType: 'pick', tier: 4, dmg: 7 },
-            31: { id: 31, name: 'Wood Sword', color: '#A1887F', type: 'tool', toolType: 'sword', tier: 1, dmg: 4 }
+            20: { id: 20, name: '棒', color: '#8D6E63', type: 'item' },
+            21: { id: 21, name: '木のツルハシ', color: '#A1887F', type: 'tool', toolType: 'pick', tier: 1, dmg: 2 },
+            22: { id: 22, name: '石のツルハシ', color: '#757575', type: 'tool', toolType: 'pick', tier: 2, dmg: 3 },
+            23: { id: 23, name: '木の斧', color: '#A1887F', type: 'tool', toolType: 'axe', tier: 1, dmg: 3 },
+            24: { id: 24, name: '石の剣', color: '#9E9E9E', type: 'tool', toolType: 'sword', tier: 2, dmg: 6 },
+            25: { id: 25, name: '生の豚肉', color: '#F48FB1', type: 'item', food: 3 },
+            26: { id: 26, name: '羊毛', color: '#EEEEEE', type: 'item' },
+            27: { id: 27, name: '生の牛肉', color: '#D32F2F', type: 'item', food: 4 },
+            28: { id: 28, name: '生の鶏肉', color: '#FFCC80', type: 'item', food: 2 },
+            29: { id: 29, name: '鉄のツルハシ', color: '#E0E0E0', type: 'tool', toolType: 'pick', tier: 3, dmg: 5 },
+            30: { id: 30, name: 'ダイヤのツルハシ', color: '#84FFFF', type: 'tool', toolType: 'pick', tier: 4, dmg: 7 },
+            31: { id: 31, name: '木の剣', color: '#A1887F', type: 'tool', toolType: 'sword', tier: 1, dmg: 4 }
         };
 
         const RECIPES = [
-            { result: {id: 11, count: 4}, req: [{id: 4, count: 1}], name: 'Planks x4' }, // Wood -> Planks
-            { result: {id: 20, count: 4}, req: [{id: 11, count: 2}], name: 'Stick x4' }, // Planks -> Sticks
-            { result: {id: 21, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: 'Wood Pickaxe' },
-            { result: {id: 22, count: 1}, req: [{id: 3, count: 3}, {id: 20, count: 2}], name: 'Stone Pickaxe' },
-            { result: {id: 29, count: 1}, req: [{id: 8, count: 3}, {id: 20, count: 2}], name: 'Iron Pickaxe' },
-            { result: {id: 30, count: 1}, req: [{id: 9, count: 3}, {id: 20, count: 2}], name: 'Diamond Pickaxe' },
-            { result: {id: 23, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: 'Wood Axe' },
-            { result: {id: 31, count: 1}, req: [{id: 11, count: 2}, {id: 20, count: 1}], name: 'Wood Sword' },
-            { result: {id: 24, count: 1}, req: [{id: 3, count: 2}, {id: 20, count: 1}], name: 'Stone Sword' },
-            { result: {id: 10, count: 1}, req: [{id: 26, count: 3}, {id: 11, count: 3}], name: 'Bed' }
+            { result: {id: 11, count: 4}, req: [{id: 4, count: 1}], name: '木材 x4' },
+            { result: {id: 20, count: 4}, req: [{id: 11, count: 2}], name: '棒 x4' },
+            { result: {id: 14, count: 4}, req: [{id: 13, count: 1}, {id: 20, count: 1}], name: '松明 x4' },
+            { result: {id: 15, count: 3}, req: [{id: 20, count: 7}], name: 'ハシゴ x3' },
+            { result: {id: 21, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: '木のツルハシ' },
+            { result: {id: 22, count: 1}, req: [{id: 3, count: 3}, {id: 20, count: 2}], name: '石のツルハシ' },
+            { result: {id: 29, count: 1}, req: [{id: 8, count: 3}, {id: 20, count: 2}], name: '鉄のツルハシ' },
+            { result: {id: 30, count: 1}, req: [{id: 9, count: 3}, {id: 20, count: 2}], name: 'ダイヤのツルハシ' },
+            { result: {id: 23, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: '木の斧' },
+            { result: {id: 31, count: 1}, req: [{id: 11, count: 2}, {id: 20, count: 1}], name: '木の剣' },
+            { result: {id: 24, count: 1}, req: [{id: 3, count: 2}, {id: 20, count: 1}], name: '石の剣' },
+            { result: {id: 10, count: 1}, req: [{id: 26, count: 3}, {id: 11, count: 3}], name: 'ベッド' }
         ];
 
-        // --- State Variables ---
+        let gameMode = 'survival'; // 'survival' or 'creative'
         let world = [];
+        let lightMap = []; // For lighting
         let timeTicks = 0;
         let isNight = false;
         
-        // Exactly 1 block jump: v = 4.5, g = 0.5 => Height = 20.25px (1 block = 20px)
-        // 2 block jump: v = 6.5, g = 0.5 => Height = 42.25px (2 blocks = 40px)
         const GRAVITY = 0.5;
-        const JUMP_VEL = -6.5;
-        const MAX_FALL = 10;
+        const JUMP_VEL = -8.5; // ~2 blocks jump
+        const MAX_FALL = 12;
 
         let player = {
-            x: 0, y: 0, w: 14, h: 24, vx: 0, vy: 0, speed: 3,
-            hp: 100, maxHp: 100, dead: false, facingRight: true, grounded: false, inWater: false
+            x: 0, y: 0, w: 16, h: 28, vx: 0, vy: 0, speed: 4,
+            hp: 20, maxHp: 20, food: 20, maxFood: 20, 
+            dead: false, facingRight: true, grounded: false, inWater: false, onLadder: false
         };
 
-        let inventory = []; // Array of {id, count}
-        let hotbarSelection = 0; // 0-8
+        let inventory = []; 
+        let hotbarSelection = 0;
         let mobs = [];
         let drops = [];
         let keys = {};
         let gameLoopId;
         let camera = { x: 0, y: 0 };
 
-        // --- HTML Elements ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const timeOverlay = document.getElementById('timeOverlay');
-        const hotbarEl = document.getElementById('hotbar');
-        const invModal = document.getElementById('inventoryModal');
-        const invGrid = document.getElementById('invGrid');
-        const craftList = document.getElementById('craftList');
-        const healthBar = document.getElementById('healthBar');
-        const deathScreen = document.getElementById('deathScreen');
-        const statusMessage = document.getElementById('statusMessage');
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Core Functions ---
+        // --- World Generation ---
         function generateWorld() {
             world = [];
             let heights = [];
-            // Simple terrain generation using sine waves
+            
+            // Terrain generation
             for(let x=0; x<WORLD_COLS; x++) {
-                let h = 20 + Math.sin(x*0.1)*5 + Math.sin(x*0.05)*3;
+                // Base height + hills
+                let h = 30 + Math.sin(x*0.05)*10 + Math.sin(x*0.1)*5;
                 heights.push(Math.floor(h));
             }
 
@@ -255,103 +256,123 @@
                 let row = [];
                 for (let x = 0; x < WORLD_COLS; x++) {
                     let terrainH = heights[x];
-                    
+                    let block = 0;
+
                     if (y < terrainH) {
-                        // Above ground
-                        if (y >= 25) row.push(7); // Water level at y=25
-                        else row.push(0); // Air
+                        if (y >= 35) block = 7; // Water level
                     } else if (y === terrainH) {
-                        // Surface
-                        if (y >= 25) row.push(6); // Sand near water
-                        else row.push(1); // Grass
-                    } else if (y > terrainH && y < terrainH + 5) {
-                        // Shallow underground
-                        row.push(2); // Dirt
+                        if (y >= 35) block = 6; // Sand near water
+                        else block = 1; // Grass
+                    } else if (y > terrainH && y < terrainH + 4) {
+                        block = 2; // Dirt
                     } else {
-                        // Deep underground
-                        let block = 3; // Stone
-                        // Ores (only deep down)
-                        if (y > 40) {
-                            if (Math.random() < 0.03) block = 8; // Iron
-                            if (y > 50 && Math.random() < 0.01) block = 9; // Diamond
+                        block = 3; // Stone
+                        
+                        // Caves (Simple random noise thresholding)
+                        if (y > terrainH + 5) {
+                            let caveNoise = Math.sin(x*0.2)*Math.cos(y*0.2) + Math.random();
+                            if(caveNoise > 1.2) block = 0; // Air (Cave)
                         }
-                        row.push(block);
+
+                        // Ores
+                        if (block === 3) {
+                            if(Math.random() < 0.05) block = 12; // Coal
+                            if(y > 50 && Math.random() < 0.03) block = 8; // Iron
+                            if(y > 80 && Math.random() < 0.01) block = 9; // Diamond
+                        }
                     }
+                    row.push(block);
                 }
                 world.push(row);
             }
 
-            // Trees Generation
-            for (let x = 5; x < WORLD_COLS - 5; x++) {
+            // Trees & Villages
+            let villagePlaced = false;
+            for (let x = 10; x < WORLD_COLS - 10; x++) {
                 let h = heights[x];
-                // Only on grass, above water, 10% chance
-                if (h < 25 && world[h][x] === 1 && Math.random() < 0.1) {
-                    // Prevent trees too close
-                    if (world[h-1][x] !== 0) continue; 
+                if (h < 35 && world[h][x] === 1) {
                     
-                    let treeHeight = 3 + Math.floor(Math.random()*3);
-                    // Trunk
-                    for(let ty = 1; ty <= treeHeight; ty++) {
-                        if(h-ty >= 0) world[h-ty][x] = 4;
-                    }
-                    // Leaves
-                    for(let ly = h-treeHeight-2; ly <= h-treeHeight; ly++) {
-                        for(let lx = x-1; lx <= x+1; lx++) {
-                            if(ly>=0 && lx>=0 && lx<WORLD_COLS && world[ly][lx]===0) {
-                                world[ly][lx] = 5;
+                    // Village generation (one per world ideally)
+                    if (!villagePlaced && Math.random() < 0.05 && x < WORLD_COLS - 20) {
+                        // Build a house
+                        for(let hx=0; hx<5; hx++) {
+                            for(let hy=0; hy<4; hy++) {
+                                if(hx===0||hx===4||hy===3) world[h-1-hy][x+hx] = 11; // Planks
+                                else world[h-1-hy][x+hx] = 0; // Inside
                             }
                         }
+                        world[h-2][x+2] = 16; // Glass window
+                        world[h-1][x+1] = 14; // Torch inside
+                        spawnMob('villager', (x+2)*TILE_SIZE, (h-2)*TILE_SIZE);
+                        villagePlaced = true;
+                        x += 10;
+                        continue;
+                    }
+
+                    // Trees
+                    if (Math.random() < 0.1 && world[h-1][x] === 0) {
+                        let treeHeight = 4 + Math.floor(Math.random()*2);
+                        for(let ty = 1; ty <= treeHeight; ty++) {
+                            if(h-ty >= 0) world[h-ty][x] = 4;
+                        }
+                        for(let ly = h-treeHeight-2; ly <= h-treeHeight; ly++) {
+                            for(let lx = x-2; lx <= x+2; lx++) {
+                                if(ly>=0 && lx>=0 && lx<WORLD_COLS && world[ly][lx]===0 && Math.random()<0.8) {
+                                    world[ly][lx] = 5;
+                                }
+                            }
+                        }
+                        x += 3; // spacing
                     }
                 }
             }
 
-            // Init Player
+            // Spawn Player
             let spawnX = Math.floor(WORLD_COLS / 2);
             let spawnY = heights[spawnX] - 2;
-            
-            // 上に向かって空きスペースを探す（木や地形に埋まらないように）
-            while (spawnY >= 0) {
-                let b = world[spawnY][spawnX];
-                let isSolid = b !== 0 && ITEMS[b] && ITEMS[b].solid !== false;
-                if (!isSolid) {
-                    // 頭上のブロックも確認
-                    let bAbove = spawnY > 0 ? world[spawnY - 1][spawnX] : 0;
-                    let isSolidAbove = bAbove !== 0 && ITEMS[bAbove] && ITEMS[bAbove].solid !== false;
-                    if (!isSolidAbove) {
-                        break; // プレイヤーの2ブロック分が空いている
-                    }
-                }
-                spawnY--;
-            }
+            while(spawnY > 0 && world[spawnY][spawnX] !== 0) spawnY--;
 
             player.x = spawnX * TILE_SIZE;
             player.y = spawnY * TILE_SIZE;
-            player.hp = player.maxHp;
-            player.dead = false;
+            resetPlayerStats();
             
-            mobs = [];
-            drops = [];
-            timeTicks = 0;
+            mobs = []; drops = []; timeTicks = 0;
+            
+            if (gameMode === 'creative') fillCreativeInventory();
             updateUI();
         }
 
+        function resetPlayerStats() {
+            player.hp = player.maxHp;
+            player.food = player.maxFood;
+            player.dead = false;
+            player.vx = 0; player.vy = 0;
+        }
+
+        function fillCreativeInventory() {
+            inventory = [];
+            Object.values(ITEMS).forEach(item => {
+                if(item.id !== 0 && item.id !== 5 && item.id !== 7) { // Skip air, leaves, water
+                    inventory.push({ id: item.id, count: 99 });
+                }
+            });
+        }
+
+        // --- Inventory Management ---
         function addToInventory(itemId, count = 1) {
+            if (gameMode === 'creative') return; // Don't add drops in creative
             let existing = inventory.find(i => i.id === itemId);
-            if (existing) {
-                existing.count += count;
-            } else {
-                inventory.push({ id: itemId, count: count });
-            }
+            if (existing) existing.count += count;
+            else inventory.push({ id: itemId, count: count });
             renderInventory();
         }
 
         function removeFromInventory(itemId, count = 1) {
+            if (gameMode === 'creative') return true; // Infinite items
             let index = inventory.findIndex(i => i.id === itemId);
             if (index !== -1) {
                 inventory[index].count -= count;
-                if (inventory[index].count <= 0) {
-                    inventory.splice(index, 1);
-                }
+                if (inventory[index].count <= 0) inventory.splice(index, 1);
                 renderInventory();
                 return true;
             }
@@ -359,11 +380,12 @@
         }
 
         function countItem(itemId) {
+            if (gameMode === 'creative') return 99;
             let item = inventory.find(i => i.id === itemId);
             return item ? item.count : 0;
         }
 
-        // --- Physics & Collision ---
+        // --- Physics ---
         function checkTileCollision(ent) {
             let left = Math.floor(ent.x / TILE_SIZE);
             let right = Math.floor((ent.x + ent.w - 0.01) / TILE_SIZE);
@@ -373,6 +395,7 @@
             if (left < 0 || right >= WORLD_COLS || top < 0 || bottom >= WORLD_ROWS) return true;
 
             ent.inWater = false;
+            ent.onLadder = false;
             let hitSolid = false;
 
             for (let y = top; y <= bottom; y++) {
@@ -380,11 +403,9 @@
                     let bId = world[y][x];
                     if (bId !== 0) {
                         let blockDef = ITEMS[bId];
-                        if (blockDef.liquid) {
-                            ent.inWater = true;
-                        } else if (blockDef.solid !== false) {
-                            hitSolid = true;
-                        }
+                        if (blockDef.liquid) ent.inWater = true;
+                        else if (blockDef.climbable) ent.onLadder = true;
+                        else if (blockDef.solid !== false) hitSolid = true;
                     }
                 }
             }
@@ -396,7 +417,7 @@
             if (checkTileCollision(ent)) {
                 ent.x -= dx;
                 ent.vx = 0;
-                if(ent.type === 'zombie' || ent.type === 'witch' || ent.type === 'animal') ent.vxTarget *= -1; // reverse
+                if(ent.type) ent.vxTarget *= -1; // mobs turn around
             }
             
             ent.y += dy;
@@ -409,46 +430,59 @@
             }
         }
 
-        // --- Spawning & Entities ---
-        function spawnMob(type) {
-            let x = Math.random() * (WORLD_COLS * TILE_SIZE);
-            let y = 5 * TILE_SIZE; // Drop from sky
+        // --- Mobs ---
+        function spawnMob(type, x, y) {
+            x = x || Math.random() * (WORLD_COLS * TILE_SIZE);
+            y = y || 10 * TILE_SIZE; 
             
-            let m = { x, y, vx: 0, vy: 0, vxTarget: 1, type: type, hp: 20, maxHp: 20, dmg: 0, color: 'white', w: 14, h: 14 };
+            let m = { x, y, vx: 0, vy: 0, vxTarget: 1, type: type, hp: 10, maxHp: 10, dmg: 0, w: 16, h: 16, state: 0 };
             
             switch(type) {
-                case 'pig': m.color = '#F48FB1'; m.drop = 25; m.w = 16; break;
-                case 'sheep': m.color = '#EEEEEE'; m.drop = 26; m.w = 16; break;
-                case 'cow': m.color = '#795548'; m.drop = 27; m.w = 18; m.h = 18; m.hp = 30; break;
-                case 'chicken': m.color = '#FFCC80'; m.drop = 28; m.w = 10; m.h = 10; m.hp = 5; break;
-                case 'zombie': m.color = '#2E7D32'; m.hp = 30; m.dmg = 10; m.w = 14; m.h = 24; m.hostile = true; break;
-                case 'witch': m.color = '#6A1B9A'; m.hp = 150; m.maxHp = 150; m.dmg = 20; m.w = 16; m.h = 26; m.hostile = true; m.boss = true; break;
+                case 'pig': m.color = '#F8BBD0'; m.drop = 25; m.w=20; m.h=14; break;
+                case 'sheep': m.color = '#EEEEEE'; m.drop = 26; m.w=20; m.h=16; break;
+                case 'cow': m.color = '#795548'; m.drop = 27; m.w=24; m.h=20; m.hp=15; break;
+                case 'chicken': m.color = '#FFF9C4'; m.drop = 28; m.w=12; m.h=12; m.hp=5; break;
+                case 'villager': m.color = '#A1887F'; m.w=16; m.h=28; m.hp=20; break;
+                case 'zombie': m.color = '#388E3C'; m.hp=20; m.dmg=3; m.w=16; m.h=28; m.hostile=true; break;
+                case 'creeper': m.color = '#4CAF50'; m.hp=20; m.dmg=0; m.w=16; m.h=28; m.hostile=true; m.explode=true; break;
+                case 'witch': m.color = '#6A1B9A'; m.hp=50; m.maxHp=50; m.dmg=5; m.w=16; m.h=28; m.hostile=true; m.boss=true; break;
             }
             m.vxTarget = (Math.random() > 0.5 ? 1 : -1);
             mobs.push(m);
         }
 
         function maintainMobs() {
-            if (mobs.length < 5) {
-                if (isNight) {
-                    if (Math.random() < 0.05 && !mobs.some(m => m.boss)) spawnMob('witch');
-                    else spawnMob('zombie');
-                } else {
-                    const animals = ['pig', 'sheep', 'cow', 'chicken'];
-                    spawnMob(animals[Math.floor(Math.random() * animals.length)]);
+            if (mobs.length < 8) {
+                // Find a surface block to spawn
+                let x = Math.floor(Math.random() * WORLD_COLS);
+                let y = 0;
+                while(y < WORLD_ROWS && world[y][x] === 0) y++;
+                
+                if(y < WORLD_ROWS) {
+                    let ty = y - 2; // Above ground
+                    if(ty > 0) {
+                        if (isNight) {
+                            let r = Math.random();
+                            if(r < 0.05 && !mobs.some(m => m.boss)) spawnMob('witch', x*TILE_SIZE, ty*TILE_SIZE);
+                            else if(r < 0.3) spawnMob('creeper', x*TILE_SIZE, ty*TILE_SIZE);
+                            else spawnMob('zombie', x*TILE_SIZE, ty*TILE_SIZE);
+                        } else {
+                            const animals = ['pig', 'sheep', 'cow', 'chicken'];
+                            spawnMob(animals[Math.floor(Math.random() * animals.length)], x*TILE_SIZE, ty*TILE_SIZE);
+                        }
+                    }
                 }
             }
         }
 
         function spawnDrop(id, x, y) {
             if(!id) return;
-            // Pop slightly upwards
-            drops.push({ id, x, y, w: 8, h: 8, vx: (Math.random()-0.5)*2, vy: -3, life: 600 });
+            drops.push({ id, x, y, w: 10, h: 10, vx: (Math.random()-0.5)*4, vy: -4, life: 600 });
         }
 
         // --- Game Update Loop ---
         function update() {
-            if (!currentUser) return;
+            if (!currentUser || document.getElementById('titleUI').style.display === 'flex') return;
 
             // Time progression
             timeTicks++;
@@ -457,123 +491,131 @@
             let wasNight = isNight;
             isNight = timeTicks >= DAY_FRAMES;
             
-            // Visual time update
-            if (isNight) {
-                let nightProgress = (timeTicks - DAY_FRAMES) / NIGHT_FRAMES;
-                // Fade in night, stay dark, fade out
-                let alpha = nightProgress < 0.1 ? nightProgress * 8 : (nightProgress > 0.9 ? (1-nightProgress)*10 : 0.8);
-                timeOverlay.style.backgroundColor = `rgba(0, 0, 15, ${Math.min(0.8, alpha)})`;
-            } else {
-                timeOverlay.style.backgroundColor = `rgba(0,0,0,0)`;
-                // Despawn hostiles instantly at daybreak for simplicity
-                if(wasNight && !isNight) {
-                    mobs = mobs.filter(m => !m.hostile);
+            if (wasNight && !isNight) {
+                // Morning: burn zombies/creepers
+                mobs = mobs.filter(m => !m.hostile);
+            }
+
+            if (timeTicks % 60 === 0) maintainMobs();
+
+            // Food & Health Mechanics (Survival only)
+            if (gameMode === 'survival' && !player.dead) {
+                if (timeTicks % 600 === 0 && player.vx !== 0) player.food = Math.max(0, player.food - 0.5); // move drain
+                
+                if (timeTicks % 120 === 0) {
+                    if (player.food === 0) {
+                        player.hp -= 1; // Starving
+                    } else if (player.food > 15 && player.hp < player.maxHp) {
+                        player.hp += 1; // Regen
+                    }
                 }
             }
 
-            maintainMobs();
-
             // Player Physics
             if (!player.dead) {
-                let speed = player.inWater ? player.speed * 0.5 : player.speed;
-                if (keys['KeyA'] || keys['ArrowLeft']) { player.vx = -speed; player.facingRight = false; }
-                else if (keys['KeyD'] || keys['ArrowRight']) { player.vx = speed; player.facingRight = true; }
-                else { player.vx = 0; }
+                let speed = player.inWater ? player.speed * 0.6 : player.speed;
+                if (gameMode === 'creative' && keys['KeyW']) {
+                    // Flying in creative
+                    player.vy = -5; player.grounded = false;
+                } else {
+                    if (keys['KeyA'] || keys['ArrowLeft']) { player.vx = -speed; player.facingRight = false; }
+                    else if (keys['KeyD'] || keys['ArrowRight']) { player.vx = speed; player.facingRight = true; }
+                    else { player.vx = 0; }
 
-                if ((keys['KeyW'] || keys['ArrowUp'] || keys['Space'])) {
-                    if (player.grounded) {
-                        player.vy = JUMP_VEL;
-                        player.grounded = false;
-                    } else if (player.inWater) {
-                        let headInWater = false;
-                        let ty = Math.floor(player.y / TILE_SIZE);
-                        let tx1 = Math.floor(player.x / TILE_SIZE);
-                        let tx2 = Math.floor((player.x + player.w - 0.01) / TILE_SIZE);
-                        if (ty >= 0 && ty < WORLD_ROWS) {
-                            for(let x = tx1; x <= tx2; x++) {
-                                let b = world[ty][x];
-                                if(b !== 0 && ITEMS[b] && ITEMS[b].liquid) headInWater = true;
-                            }
-                        }
-                        
-                        if (headInWater) {
-                            player.vy = JUMP_VEL * 0.6; // Swim up
-                        } else {
-                            player.vy = JUMP_VEL; // Pop out of water
+                    if ((keys['KeyW'] || keys['ArrowUp'] || keys['Space'])) {
+                        if (player.grounded || player.onLadder) {
+                            player.vy = player.onLadder ? -3 : JUMP_VEL;
+                            player.grounded = false;
+                        } else if (player.inWater) {
+                            // Water swim/jump logic
+                            let tyTop = Math.floor(player.y / TILE_SIZE);
+                            let tyBot = Math.floor((player.y+player.h) / TILE_SIZE);
+                            let tx = Math.floor((player.x+player.w/2) / TILE_SIZE);
+                            let headInWater = tyTop>=0 && ITEMS[world[tyTop][tx]] && ITEMS[world[tyTop][tx]].liquid;
+                            let feetInWater = tyBot<WORLD_ROWS && ITEMS[world[tyBot][tx]] && ITEMS[world[tyBot][tx]].liquid;
+
+                            if(headInWater) player.vy = -3; // swim up
+                            else if(feetInWater) player.vy = JUMP_VEL; // jump out
                         }
                     }
                 }
 
-                let grav = player.inWater ? GRAVITY * 0.3 : GRAVITY;
-                player.vy += grav;
+                let grav = player.inWater ? GRAVITY * 0.4 : GRAVITY;
+                if(player.onLadder && player.vy > 1) player.vy = 1; // slide down ladder slowly
+                if(gameMode !== 'creative') player.vy += grav;
+                else if(!keys['KeyW']) { player.vy += grav; if(player.vy > MAX_FALL) player.vy = MAX_FALL; } // creative fall
+
                 if (player.vy > MAX_FALL) player.vy = MAX_FALL;
 
                 moveEntity(player, player.vx, player.vy);
 
-                // Water physics logic (float slowly)
-                if(player.inWater && player.vy > 2) player.vy = 2;
-
-                // Death check
                 if (player.y > WORLD_ROWS * TILE_SIZE) player.hp = 0;
 
-                if (player.hp <= 0) {
+                if (player.hp <= 0 && gameMode === 'survival') {
                     player.dead = true;
-                    player.vy = -8; // death jump
-                    deathScreen.classList.remove('hidden');
+                    player.vy = -10; 
+                    document.getElementById('deathScreen').classList.remove('hidden');
                     setTimeout(() => {
-                        player.hp = player.maxHp;
-                        player.x = (WORLD_COLS / 2) * TILE_SIZE;
-                        player.y = 10 * TILE_SIZE;
-                        player.dead = false;
-                        player.vx = 0; player.vy = 0;
-                        deathScreen.classList.add('hidden');
+                        let spawnX = Math.floor(WORLD_COLS / 2);
+                        let spawnY = 0;
+                        while(spawnY < WORLD_ROWS && world[spawnY][spawnX] === 0) spawnY++;
+                        player.x = spawnX * TILE_SIZE; player.y = (spawnY-2) * TILE_SIZE;
+                        resetPlayerStats();
+                        document.getElementById('deathScreen').classList.add('hidden');
                         updateUI();
                     }, 3000);
                 }
             } else {
-                // Dead motion
-                player.y += player.vy;
-                player.x += player.vx;
-                player.vy += GRAVITY;
+                player.y += player.vy; player.x += player.vx; player.vy += GRAVITY;
             }
 
             // Mobs Update
             for (let i = mobs.length - 1; i >= 0; i--) {
                 let m = mobs[i];
                 
-                // AI
-                if(m.hostile && !player.dead) {
+                if(m.hostile && !player.dead && gameMode === 'survival') {
                     let dist = Math.abs(m.x - player.x);
-                    if(dist < 300) {
+                    let distY = Math.abs(m.y - player.y);
+                    
+                    if(dist < 300 && distY < 100) {
                         m.vxTarget = m.x < player.x ? 1 : -1;
-                        if(m.boss) m.vxTarget *= 1.5; // boss faster
+                        if(m.boss) m.vxTarget *= 1.5;
                         
-                        // Jump over obstacles
+                        // Creeper explosion logic
+                        if(m.explode) {
+                            if(dist < 40 && distY < 40) {
+                                m.state++; // fuse
+                                m.color = m.state % 10 < 5 ? '#FFFFFF' : '#4CAF50'; // flash
+                                m.vxTarget = 0; // stop moving
+                                if(m.state > 60) {
+                                    // BOOM
+                                    createExplosion(m.x + m.w/2, m.y + m.h/2, 3);
+                                    if(dist < 60) player.hp -= 10;
+                                    mobs.splice(i, 1);
+                                    continue;
+                                }
+                            } else {
+                                m.state = 0; m.color = '#4CAF50';
+                            }
+                        }
+
                         if(m.grounded && m.vx === 0 && Math.random() < 0.1) m.vy = JUMP_VEL;
-                        // Boss jump randomly
-                        if(m.boss && m.grounded && Math.random() < 0.02) m.vy = JUMP_VEL * 1.2;
                     }
-                } else if(Math.random() < 0.01) {
-                    // Random walk
-                    m.vxTarget = (Math.random() > 0.5 ? 1 : -1) * (m.boss ? 1.5 : 0.5);
+                } else if(Math.random() < 0.02 && !m.explode) {
+                    m.vxTarget = (Math.random() > 0.5 ? 1 : -1) * 0.5;
                 }
 
-                m.vx = m.vxTarget;
-                m.vy += m.inWater ? GRAVITY*0.3 : GRAVITY;
+                if(!m.explode || m.state === 0) m.vx = m.vxTarget;
+                
+                m.vy += m.inWater ? GRAVITY*0.4 : GRAVITY;
                 if (m.vy > MAX_FALL) m.vy = MAX_FALL;
-
                 moveEntity(m, m.vx, m.vy);
 
                 // Damage Player
-                if (m.hostile && !player.dead) {
+                if (m.hostile && m.dmg > 0 && !player.dead && gameMode === 'survival') {
                     if (player.x < m.x + m.w && player.x + player.w > m.x && player.y < m.y + m.h && player.y + player.h > m.y) {
-                        player.hp -= m.dmg * 0.1; // Per frame damage, scaling
-                        updateUI();
-                        // Knockback
-                        if(player.hp > 0) {
-                            player.vx = (player.x > m.x) ? 5 : -5;
-                            player.vy = -3;
-                        }
+                        player.hp -= m.dmg * 0.1; // continuous minor damage
+                        if(player.hp > 0) { player.vx = (player.x > m.x) ? 6 : -6; player.vy = -3; }
                     }
                 }
 
@@ -583,46 +625,54 @@
                 }
             }
 
-            // Drops Update & Collection
+            // Drops Collection
             for (let i = drops.length - 1; i >= 0; i--) {
                 let d = drops[i];
-                d.vy += GRAVITY;
-                if(d.vy > MAX_FALL) d.vy = MAX_FALL;
+                d.vy += GRAVITY; if(d.vy > MAX_FALL) d.vy = MAX_FALL;
                 moveEntity(d, d.vx, d.vy);
-                d.vx *= 0.9; // friction
-                d.life--;
+                d.vx *= 0.9; d.life--;
 
-                // Player pickup
-                if (!player.dead && d.life < 580) { // small delay before pickup
+                if (!player.dead && d.life < 580) {
                     if (player.x < d.x + d.w && player.x + player.w > d.x && player.y < d.y + d.h && player.y + player.h > d.y) {
                         addToInventory(d.id, 1);
                         drops.splice(i, 1);
                         continue;
                     }
                 }
-
                 if (d.life <= 0) drops.splice(i, 1);
             }
 
             // Camera follow
             camera.x = player.x - canvas.width / 2 + player.w / 2;
             camera.y = player.y - canvas.height / 2 + player.h / 2;
-            
-            // Clamp camera
             if(camera.x < 0) camera.x = 0;
             if(camera.x > WORLD_COLS * TILE_SIZE - canvas.width) camera.x = WORLD_COLS * TILE_SIZE - canvas.width;
             if(camera.y > WORLD_ROWS * TILE_SIZE - canvas.height) camera.y = WORLD_ROWS * TILE_SIZE - canvas.height;
+            if(camera.y < 0) camera.y = 0;
+
+            updateUI();
         }
 
-        let mouseX = 0;
-        let mouseY = 0;
-        window.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
+        function createExplosion(ex, ey, radius) {
+            let tx = Math.floor(ex / TILE_SIZE);
+            let ty = Math.floor(ey / TILE_SIZE);
+            for(let y = ty - radius; y <= ty + radius; y++) {
+                for(let x = tx - radius; x <= tx + radius; x++) {
+                    if(x>=0 && x<WORLD_COLS && y>=0 && y<WORLD_ROWS) {
+                        if(Math.hypot(x-tx, y-ty) <= radius && world[y][x] !== 7) {
+                            world[y][x] = 0; // Destroy block
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Interaction ---
+        let mouseX = 0, mouseY = 0;
+        window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
 
         function handleInteraction(isPlacing) {
-            if(!currentUser || player.dead || invModal.style.display === 'flex') return;
+            if(!currentUser || player.dead || document.getElementById('inventoryModal').style.display === 'flex') return;
 
             const mx = mouseX + camera.x;
             const my = mouseY + camera.y;
@@ -630,72 +680,66 @@
             let heldItem = inventory[hotbarSelection];
             let tool = heldItem ? ITEMS[heldItem.id] : null;
 
-            // 1. Attack Mobs (When Placing / Left Click / K key)
+            // Attack Mobs (Left Click)
             if (isPlacing) {
                 for (let i = 0; i < mobs.length; i++) {
                     let m = mobs[i];
                     if (mx >= m.x && mx <= m.x + m.w && my >= m.y && my <= m.y + m.h) {
-                        let dmg = 5; // Base fists
-                        if(tool && tool.type === 'tool') dmg += tool.dmg * 5;
-                        
+                        let dmg = 2; 
+                        if(tool && tool.type === 'tool') dmg += tool.dmg * 2;
                         m.hp -= dmg;
-                        m.vxTarget = (m.x > player.x) ? 4 : -4;
-                        m.vy = -3;
-                        return; // Did attack, don't interact with blocks
+                        m.vxTarget = (m.x > player.x) ? 5 : -5; m.vy = -3;
+                        return;
                     }
                 }
             }
 
-            // 2. Block Interaction
+            // Block Action
             const tx = Math.floor(mx / TILE_SIZE);
             const ty = Math.floor(my / TILE_SIZE);
-
             if (tx < 0 || tx >= WORLD_COLS || ty < 0 || ty >= WORLD_ROWS) return;
             
-            // Distance check (reach = ~4 blocks)
-            let dist = Math.hypot((tx*TILE_SIZE+10) - (player.x+player.w/2), (ty*TILE_SIZE+10) - (player.y+player.h/2));
-            if(dist > TILE_SIZE * 5) return;
+            let dist = Math.hypot((tx*TILE_SIZE+TILE_SIZE/2) - (player.x+player.w/2), (ty*TILE_SIZE+TILE_SIZE/2) - (player.y+player.h/2));
+            if(dist > TILE_SIZE * 6) return; // Reach
 
             if (!isPlacing) {
-                // Right Click / L key: Mine / Use Bed
+                // Right Click / L: Mine or Use
                 let bId = world[ty][tx];
                 
-                if (bId === 10) {
-                    if (isNight) {
-                        timeTicks = 0; // Skip to morning
-                        showMessage("Slept through the night!");
-                    } else {
-                        showMessage("You can only sleep at night.", true);
-                    }
+                if (bId === 10) { // Bed
+                    if (isNight) { timeTicks = 0; showMessage("朝まで寝ました"); } 
+                    else showMessage("夜しか寝られません");
                     return;
                 }
 
                 if (bId !== 0 && ITEMS[bId] && !ITEMS[bId].liquid) {
-                    let blockInfo = ITEMS[bId];
-
+                    let bInfo = ITEMS[bId];
                     let canMine = true;
-                    if (blockInfo.reqTool) {
-                        if(!tool || (tool.id !== 22 && tool.id !== 29 && tool.id !== 30)) {
-                            canMine = false;
-                            showMessage("Requires proper Pickaxe!", true);
-                        }
+                    if (bInfo.reqTool && gameMode === 'survival') {
+                        let tTier = tool ? tool.tier || 0 : 0;
+                        let rTier = bInfo.reqTool === 'wood_pick' ? 1 : bInfo.reqTool === 'stone_pick' ? 2 : 3;
+                        if(tTier < rTier || tool.toolType !== 'pick') canMine = false;
                     }
+
+                    if(gameMode === 'creative') canMine = true;
 
                     if (canMine) {
                         world[ty][tx] = 0; 
-                        if (blockInfo.drop) spawnDrop(blockInfo.drop, tx*TILE_SIZE + 4, ty*TILE_SIZE + 4);
+                        if (bInfo.drop) spawnDrop(bInfo.drop, tx*TILE_SIZE + 6, ty*TILE_SIZE + 6);
+                    } else {
+                        showMessage("適したツルハシが必要です！", true);
                     }
                 }
             } else {
-                // Left Click / K key: Place
+                // Left Click / K: Place
                 let bId = world[ty][tx];
-                
-                if (bId === 0 || (ITEMS[bId] && ITEMS[bId].liquid)) {
+                if (bId === 0 || (ITEMS[bId] && (ITEMS[bId].liquid || ITEMS[bId].solid === false))) {
                     if (heldItem && ITEMS[heldItem.id].type === 'block') {
                         let pRect = { left: player.x, right: player.x+player.w, top: player.y, bottom: player.y+player.h };
                         let bRect = { left: tx*TILE_SIZE, right: tx*TILE_SIZE+TILE_SIZE, top: ty*TILE_SIZE, bottom: ty*TILE_SIZE+TILE_SIZE };
                         
-                        if (!(pRect.right > bRect.left && pRect.left < bRect.right && pRect.bottom > bRect.top && pRect.top < bRect.bottom)) {
+                        // Prevent placing inside solid entities unless it's non-solid block (like torch)
+                        if (ITEMS[heldItem.id].solid === false || !(pRect.right > bRect.left && pRect.left < bRect.right && pRect.bottom > bRect.top && pRect.top < bRect.bottom)) {
                             world[ty][tx] = heldItem.id;
                             removeFromInventory(heldItem.id, 1);
                         }
@@ -704,61 +748,69 @@
             }
         }
 
-        // --- Interaction (Mining, Placing, Attacking) ---
-        canvas.addEventListener('mousedown', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            if (e.button === 2) handleInteraction(false); // Right Click: Mine
-            else if (e.button === 0) handleInteraction(true); // Left Click: Place
+        canvas.addEventListener('mousedown', e => {
+            mouseX = e.clientX; mouseY = e.clientY;
+            if (e.button === 2) handleInteraction(false); // Right: Mine
+            else if (e.button === 0) handleInteraction(true); // Left: Place/Attack
         });
         canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-        // --- Keyboard Inputs ---
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
+            if(document.getElementById('titleUI').style.display === 'flex') return;
+
             if (e.code >= 'Digit1' && e.code <= 'Digit9') {
                 hotbarSelection = parseInt(e.code.replace('Digit', '')) - 1;
                 renderInventory();
             }
             if (e.code === 'KeyE') {
-                if (invModal.style.display === 'flex') invModal.style.display = 'none';
-                else {
-                    invModal.style.display = 'flex';
-                    renderInventory();
+                let m = document.getElementById('inventoryModal');
+                if (m.style.display === 'flex') m.style.display = 'none';
+                else { m.style.display = 'flex'; renderInventory(); }
+            }
+            if (e.code === 'KeyK') handleInteraction(true); // 置く
+            if (e.code === 'KeyL') handleInteraction(false); // 掘る
+            if (e.code === 'KeyQ') { // 捨てる
+                let heldItem = inventory[hotbarSelection];
+                if (heldItem && heldItem.count > 0 && removeFromInventory(heldItem.id, 1)) {
+                    let dropX = player.facingRight ? player.x + player.w + 5 : player.x - 15;
+                    spawnDrop(heldItem.id, dropX, player.y + player.h / 2);
                 }
             }
-            if (e.code === 'KeyK') {
-                handleInteraction(true); // 置く
-            }
-            if (e.code === 'KeyL') {
-                handleInteraction(false); // 掘る
-            }
-            if (e.code === 'KeyQ') {
-                // アイテムを捨てる
+            if (e.code === 'KeyF') { // 食べる
                 let heldItem = inventory[hotbarSelection];
-                if (heldItem && heldItem.count > 0) {
+                if (heldItem && ITEMS[heldItem.id].food && player.food < player.maxFood) {
+                    player.food = Math.min(player.maxFood, player.food + ITEMS[heldItem.id].food);
                     removeFromInventory(heldItem.id, 1);
-                    // プレイヤーの少し前にドロップさせる
-                    let dropX = player.facingRight ? player.x + player.w + 5 : player.x - 15;
-                    let dropY = player.y + player.h / 2;
-                    let id = heldItem.id;
-                    drops.push({ id, x: dropX, y: dropY, w: 8, h: 8, vx: (player.facingRight ? 3 : -3), vy: -2, life: 600 });
+                    showMessage("ムシャムシャ...");
+                    updateUI();
                 }
             }
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
+        document.getElementById('closeInvBtn').addEventListener('click', () => document.getElementById('inventoryModal').style.display = 'none');
 
-        document.getElementById('closeInvBtn').addEventListener('click', () => invModal.style.display = 'none');
-
-        // --- Render Loop ---
+        // --- Render Loop & Lighting ---
         function draw() {
-            ctx.fillStyle = '#87CEEB'; // Sky blue
+            // Sky color based on time
+            let skyColor = '#87CEEB';
+            let nightAlpha = 0;
+            if (isNight) {
+                let p = (timeTicks - DAY_FRAMES) / NIGHT_FRAMES;
+                nightAlpha = p < 0.2 ? p*4 : (p > 0.8 ? (1-p)*5 : 0.85);
+            }
+            
+            ctx.fillStyle = skyColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            if(nightAlpha > 0) {
+                ctx.fillStyle = `rgba(10, 10, 20, ${nightAlpha * 0.5})`; // darken sky
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
 
             ctx.save();
             ctx.translate(Math.floor(-camera.x), Math.floor(-camera.y));
 
-            // Visible range
             let startCol = Math.max(0, Math.floor(camera.x / TILE_SIZE));
             let endCol = Math.min(WORLD_COLS, startCol + Math.ceil(canvas.width / TILE_SIZE) + 1);
             let startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
@@ -769,108 +821,118 @@
                 for (let x = startCol; x < endCol; x++) {
                     let bId = world[y][x];
                     if (bId !== 0) {
-                        ctx.fillStyle = ITEMS[bId].color;
+                        let item = ITEMS[bId];
+                        ctx.fillStyle = item.color;
                         
-                        if (ITEMS[bId].liquid) {
+                        let bx = x * TILE_SIZE, by = y * TILE_SIZE;
+
+                        if (item.liquid) {
                             ctx.globalAlpha = 0.7;
-                            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE + 4, TILE_SIZE, TILE_SIZE - 4);
+                            ctx.fillRect(bx, by + 4, TILE_SIZE, TILE_SIZE - 4);
                             ctx.globalAlpha = 1.0;
+                        } else if (bId === 14) { // Torch
+                            ctx.fillRect(bx + TILE_SIZE/2 - 2, by + TILE_SIZE/2, 4, TILE_SIZE/2); // stick
+                            ctx.fillStyle = '#FF5722'; ctx.fillRect(bx + TILE_SIZE/2 - 3, by + TILE_SIZE/2 - 4, 6, 4); // flame
+                        } else if (bId === 15) { // Ladder
+                            ctx.strokeStyle = item.color; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.moveTo(bx+4, by); ctx.lineTo(bx+4, by+TILE_SIZE);
+                            ctx.moveTo(bx+TILE_SIZE-4, by); ctx.lineTo(bx+TILE_SIZE-4, by+TILE_SIZE);
+                            for(let i=4; i<TILE_SIZE; i+=6) { ctx.moveTo(bx+4, by+i); ctx.lineTo(bx+TILE_SIZE-4, by+i); }
+                            ctx.stroke(); ctx.lineWidth = 1;
                         } else {
-                            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                            
-                            // Simple texturing for specific blocks
-                            if (bId === 1) { // Grass top
-                                ctx.fillStyle = '#2E7D32';
-                                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 4);
-                            } else if (bId === 8 || bId === 9) { // Ores
-                                ctx.fillStyle = bId === 8 ? '#FFFFFF' : '#E0F7FA';
-                                ctx.fillRect(x * TILE_SIZE + 4, y * TILE_SIZE + 4, 4, 4);
-                                ctx.fillRect(x * TILE_SIZE + 12, y * TILE_SIZE + 10, 4, 4);
+                            ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
+                            // Texture details
+                            if (bId === 1) { ctx.fillStyle = '#2E7D32'; ctx.fillRect(bx, by, TILE_SIZE, 6); } // Grass
+                            else if (bId === 4) { ctx.fillStyle = '#3E2723'; ctx.fillRect(bx+4, by, TILE_SIZE-8, TILE_SIZE); } // Log
+                            else if (bId === 8 || bId === 9 || bId === 12) { 
+                                ctx.fillStyle = bId===8 ? '#FFF' : (bId===9 ? '#E0F7FA' : '#000');
+                                ctx.fillRect(bx+4, by+4, 4, 4); ctx.fillRect(bx+14, by+12, 4, 4); ctx.fillRect(bx+6, by+16, 4, 4);
                             }
-                            
-                            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                            ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                            ctx.strokeRect(bx, by, TILE_SIZE, TILE_SIZE);
                         }
                     }
                 }
             }
 
-            // Draw Drops
+            // Draw Entities
             drops.forEach(d => {
-                ctx.fillStyle = ITEMS[d.id].color;
-                ctx.fillRect(d.x, d.y, d.w, d.h);
-                ctx.strokeStyle = '#000';
-                ctx.strokeRect(d.x, d.y, d.w, d.h);
+                ctx.fillStyle = ITEMS[d.id].color; ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeStyle = '#000'; ctx.strokeRect(d.x, d.y, d.w, d.h);
             });
 
-            // Draw Mobs
             mobs.forEach(m => {
-                ctx.fillStyle = m.color;
-                ctx.fillRect(m.x, m.y, m.w, m.h);
-                
-                // Witch hat
-                if(m.boss) {
-                    ctx.fillStyle = '#111';
-                    ctx.beginPath();
-                    ctx.moveTo(m.x-4, m.y);
-                    ctx.lineTo(m.x+m.w+4, m.y);
-                    ctx.lineTo(m.x+m.w/2, m.y-12);
-                    ctx.fill();
+                ctx.fillStyle = m.color; ctx.fillRect(m.x, m.y, m.w, m.h);
+                if(m.boss) { // Witch hat
+                    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.moveTo(m.x-6, m.y); ctx.lineTo(m.x+m.w+6, m.y); ctx.lineTo(m.x+m.w/2, m.y-16); ctx.fill();
                 }
-
-                // Health bar for mobs if hurt
                 if(m.hp < m.maxHp) {
-                    ctx.fillStyle = 'black';
-                    ctx.fillRect(m.x, m.y - 6, m.w, 4);
-                    ctx.fillStyle = 'red';
-                    ctx.fillRect(m.x, m.y - 6, m.w * (m.hp / m.maxHp), 4);
+                    ctx.fillStyle = 'red'; ctx.fillRect(m.x, m.y - 6, m.w * (m.hp / m.maxHp), 4);
                 }
             });
 
             // Draw Player
             if (!player.dead) {
-                ctx.fillStyle = '#0288D1'; // Body
-                ctx.fillRect(player.x, player.y, player.w, player.h);
-                ctx.fillStyle = '#FFB74D'; // Head
-                ctx.fillRect(player.x + 2, player.y - 8, 10, 10);
-                
-                // Eyes
-                ctx.fillStyle = 'black';
-                if (player.facingRight) ctx.fillRect(player.x + 8, player.y - 6, 2, 2);
-                else ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
+                ctx.fillStyle = '#0288D1'; ctx.fillRect(player.x, player.y+8, player.w, player.h-8); // Body
+                ctx.fillStyle = '#FFB74D'; ctx.fillRect(player.x-2, player.y-4, player.w+4, 12); // Head
+                ctx.fillStyle = 'black'; // Eyes
+                if (player.facingRight) ctx.fillRect(player.x + 8, player.y, 2, 2);
+                else ctx.fillRect(player.x + 6, player.y, 2, 2);
 
-                // Held item visual
                 let heldItem = inventory[hotbarSelection];
                 if(heldItem && ITEMS[heldItem.id]) {
                     ctx.fillStyle = ITEMS[heldItem.id].color;
-                    if(player.facingRight) ctx.fillRect(player.x + player.w, player.y + 4, 8, 8);
-                    else ctx.fillRect(player.x - 8, player.y + 4, 8, 8);
+                    let hx = player.facingRight ? player.x + player.w : player.x - 8;
+                    ctx.fillRect(hx, player.y + 10, 8, 8);
                 }
-            } else {
-                // Dead anim
-                ctx.save();
-                ctx.translate(player.x + player.w/2, player.y + player.h/2);
-                ctx.rotate(timeTicks * 0.1);
-                ctx.fillStyle = '#0288D1';
-                ctx.fillRect(-player.w/2, -player.h/2, player.w, player.h);
-                ctx.restore();
             }
 
-            // Highlight targeted block
-            if (!player.dead && invModal.style.display !== 'flex') {
-                const mx = mouseX + camera.x;
-                const my = mouseY + camera.y;
-                const tx = Math.floor(mx / TILE_SIZE);
-                const ty = Math.floor(my / TILE_SIZE);
-                
+            // --- Lighting Layer ---
+            // Create a dark overlay and "punch holes" where light is
+            // Basic approach: Draw black rect over screen, then use destination-out to clear circles around lights
+            
+            ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.2, nightAlpha)})`; // Base darkness
+            // If deep underground, make it darker
+            let depth = (camera.y + canvas.height/2) / TILE_SIZE;
+            if(depth > 40) ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.95, 0.4 + (depth-40)*0.02)})`;
+
+            // Draw dark layer
+            ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
+
+            ctx.globalCompositeOperation = 'destination-out';
+            
+            // Function to punch light hole
+            const drawLight = (cx, cy, radius, intensity = 1) => {
+                let grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                grd.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+                grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = grd;
+                ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI*2); ctx.fill();
+            };
+
+            // Player Light (small)
+            if(!player.dead) drawLight(player.x + player.w/2, player.y + player.h/2, TILE_SIZE * 4, 0.6);
+
+            // Block Lights (Torches)
+            for (let y = startRow; y < endRow; y++) {
+                for (let x = startCol; x < endCol; x++) {
+                    let bId = world[y][x];
+                    if (bId !== 0 && ITEMS[bId].light) {
+                        drawLight(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2, ITEMS[bId].light * TILE_SIZE, 0.9);
+                    }
+                }
+            }
+
+            ctx.globalCompositeOperation = 'source-over'; // Reset
+
+            // Highlight Target
+            if (!player.dead && document.getElementById('inventoryModal').style.display !== 'flex') {
+                const mx = mouseX + camera.x; const my = mouseY + camera.y;
+                const tx = Math.floor(mx / TILE_SIZE); const ty = Math.floor(my / TILE_SIZE);
                 if (tx >= 0 && tx < WORLD_COLS && ty >= 0 && ty < WORLD_ROWS) {
-                    let dist = Math.hypot((tx * TILE_SIZE + TILE_SIZE / 2) - (player.x + player.w / 2), (ty * TILE_SIZE + TILE_SIZE / 2) - (player.y + player.h / 2));
-                    // Check if within reach
-                    if (dist <= TILE_SIZE * 5) {
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                        ctx.lineWidth = 1;
+                    if (Math.hypot((tx * TILE_SIZE + TILE_SIZE/2) - (player.x + player.w/2), (ty * TILE_SIZE + TILE_SIZE/2) - (player.y + player.h/2)) <= TILE_SIZE * 6) {
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; ctx.lineWidth = 2;
+                        ctx.strokeRect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE); ctx.lineWidth = 1;
                     }
                 }
             }
@@ -886,17 +948,20 @@
 
         // --- UI Updates ---
         function updateUI() {
-            if(healthBar) healthBar.style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+            document.getElementById('healthBar').style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+            document.getElementById('foodBar').style.width = Math.max(0, (player.food / player.maxFood) * 100) + '%';
+            document.getElementById('modeDisplay').textContent = `Mode: ${gameMode === 'creative' ? 'クリエイティブ' : 'サバイバル'}`;
         }
 
         function showMessage(msg, isError = false) {
-            statusMessage.textContent = msg;
-            statusMessage.className = `text-sm font-mono h-5 drop-shadow-md ${isError ? 'text-red-400' : 'text-yellow-300'}`;
-            setTimeout(() => { statusMessage.textContent = ''; }, 3000);
+            let el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = `text-sm font-bold drop-shadow-md h-5 ${isError ? 'text-red-400' : 'text-yellow-300'}`;
+            setTimeout(() => { el.textContent = ''; }, 3000);
         }
 
         function renderInventory() {
-            // Update Hotbar (first 9 slots)
+            const hotbarEl = document.getElementById('hotbar');
             hotbarEl.innerHTML = '';
             for(let i=0; i<9; i++) {
                 let slot = document.createElement('div');
@@ -904,162 +969,127 @@
                 slot.onclick = () => { hotbarSelection = i; renderInventory(); };
                 
                 let item = inventory[i];
-                if(item) {
+                if(item && ITEMS[item.id]) {
                     let def = ITEMS[item.id];
-                    slot.innerHTML = `
-                        <div class="slot-img" style="background-color: ${def.color};"></div>
-                        ${item.count > 1 ? `<span class="slot-count">${item.count}</span>` : ''}
-                    `;
+                    slot.innerHTML = `<div class="slot-img" style="background-color: ${def.color};"></div>
+                                      ${item.count > 1 || gameMode === 'creative' ? `<span class="slot-count">${gameMode === 'creative' ? '∞' : item.count}</span>` : ''}`;
+                    slot.title = def.name;
                 }
                 hotbarEl.appendChild(slot);
             }
 
-            // Update Full Inventory Grid
-            if(invModal.style.display === 'flex') {
+            if(document.getElementById('inventoryModal').style.display === 'flex') {
+                const invGrid = document.getElementById('invGrid');
                 invGrid.innerHTML = '';
                 inventory.forEach(item => {
                     let def = ITEMS[item.id];
+                    if(!def) return;
                     let div = document.createElement('div');
-                    div.className = 'w-12 h-12 bg-gray-700 rounded flex items-center justify-center relative shadow-inner border border-gray-600';
-                    div.innerHTML = `
-                        <div class="w-8 h-8 rounded-sm" style="background-color: ${def.color};"></div>
-                        ${item.count > 1 ? `<span class="absolute bottom-0 right-1 text-xs font-bold">${item.count}</span>` : ''}
-                    `;
-                    div.title = def.name;
+                    div.className = 'w-14 h-14 bg-gray-700 rounded flex flex-col items-center justify-center relative shadow-inner border border-gray-600 cursor-pointer hover:bg-gray-600';
+                    div.innerHTML = `<div class="w-8 h-8 rounded-sm" style="background-color: ${def.color};"></div>
+                                     <span class="text-[10px] text-gray-300 mt-1 truncate w-full text-center px-1">${def.name}</span>
+                                     ${item.count > 1 || gameMode === 'creative' ? `<span class="absolute top-1 right-1 text-xs font-bold">${gameMode === 'creative' ? '∞' : item.count}</span>` : ''}`;
                     invGrid.appendChild(div);
                 });
 
-                // Render Crafting
+                const craftList = document.getElementById('craftList');
                 craftList.innerHTML = '';
-                RECIPES.forEach(recipe => {
-                    // Check if can craft
-                    let canCraft = true;
-                    recipe.req.forEach(r => {
-                        if(countItem(r.id) < r.count) canCraft = false;
+                if(gameMode === 'survival') {
+                    RECIPES.forEach(recipe => {
+                        let canCraft = true;
+                        recipe.req.forEach(r => { if(countItem(r.id) < r.count) canCraft = false; });
+                        let btn = document.createElement('button');
+                        btn.className = 'craft-btn'; btn.disabled = !canCraft;
+                        let reqText = recipe.req.map(r => `${ITEMS[r.id].name}x${r.count}`).join(', ');
+                        btn.innerHTML = `<strong>${recipe.name}</strong><br><span class="text-xs text-gray-200">必要: ${reqText}</span>`;
+                        
+                        btn.onclick = () => {
+                            if(canCraft) {
+                                recipe.req.forEach(r => removeFromInventory(r.id, r.count));
+                                addToInventory(recipe.result.id, recipe.result.count);
+                                showMessage(`${recipe.name} を作成しました`);
+                            }
+                        };
+                        craftList.appendChild(btn);
                     });
-
-                    let btn = document.createElement('button');
-                    btn.className = 'craft-btn';
-                    btn.disabled = !canCraft;
-                    
-                    let reqText = recipe.req.map(r => `${ITEMS[r.id].name}x${r.count}`).join(', ');
-                    btn.innerHTML = `<strong>${recipe.name}</strong><br><span class="text-xs text-gray-200">Needs: ${reqText}</span>`;
-                    
-                    btn.onclick = () => {
-                        if(canCraft) {
-                            recipe.req.forEach(r => removeFromInventory(r.id, r.count));
-                            addToInventory(recipe.result.id, recipe.result.count);
-                            renderInventory();
-                            showMessage(`Crafted ${recipe.name}!`);
-                        }
-                    };
-                    craftList.appendChild(btn);
-                });
+                } else {
+                    craftList.innerHTML = '<div class="text-gray-400 p-4">クリエイティブモードではクラフトは不要です。全アイテムを持っています。</div>';
+                }
             }
         }
 
-        // --- Firebase Auth & Save/Load ---
+        // --- Firebase Auth & Navigation ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                document.getElementById('loginUI').classList.add('hidden');
-                document.getElementById('gameUI').classList.remove('hidden');
-                document.getElementById('gameUI').classList.add('flex');
-                
-                document.getElementById('userName').textContent = user.displayName || user.email;
-                if (user.photoURL) {
-                    const avatar = document.getElementById('userAvatar');
-                    avatar.src = user.photoURL;
-                    avatar.classList.remove('hidden');
-                }
-
-                if(!world.length) generateWorld(); // generate default world
-                renderInventory();
-                if(!gameLoopId) gameLoopId = requestAnimationFrame(gameLoop);
+                document.getElementById('loginUI').style.display = 'none';
+                document.getElementById('titleUI').style.display = 'flex';
             } else {
                 currentUser = null;
-                document.getElementById('loginUI').classList.remove('hidden');
+                document.getElementById('loginUI').style.display = 'flex';
+                document.getElementById('titleUI').style.display = 'none';
                 document.getElementById('gameUI').classList.add('hidden');
-                document.getElementById('gameUI').classList.remove('flex');
                 if(gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
             }
         });
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
-            try {
-                document.getElementById('loginError').classList.add('hidden');
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                console.error("Login failed:", error);
-                const errEl = document.getElementById('loginError');
-                if (error.code === 'auth/unauthorized-domain') {
-                    errEl.innerHTML = "Login failed: Unauthorized domain. Please add this preview URL to Firebase Console > Authentication > Settings > Authorized domains.";
-                } else {
-                    errEl.textContent = "Login failed. Ensure popups are allowed or try again.";
-                }
-                errEl.classList.remove('hidden');
-            }
+            try { await signInWithPopup(auth, provider); } 
+            catch (error) { console.error(error); document.getElementById('loginError').textContent = "ログイン失敗: ドメイン設定等を確認してください。"; document.getElementById('loginError').classList.remove('hidden'); }
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+        function startGame(mode) {
+            gameMode = mode;
+            document.getElementById('titleUI').style.display = 'none';
+            document.getElementById('gameUI').classList.remove('hidden');
+            document.getElementById('gameUI').classList.add('flex');
+            if(!world.length) generateWorld();
+            renderInventory();
+            if(!gameLoopId) gameLoopId = requestAnimationFrame(gameLoop);
+        }
 
-        // Save World
+        document.getElementById('btnNewSurvival').addEventListener('click', () => { world = []; startGame('survival'); });
+        document.getElementById('btnNewCreative').addEventListener('click', () => { world = []; startGame('creative'); });
+
+        document.getElementById('exitBtn').addEventListener('click', () => {
+            if(gameLoopId) cancelAnimationFrame(gameLoopId); gameLoopId = null;
+            document.getElementById('gameUI').classList.add('hidden');
+            document.getElementById('titleUI').style.display = 'flex';
+        });
+
+        // Save/Load
         document.getElementById('saveBtn').addEventListener('click', async () => {
             if (!currentUser) return;
-            const btn = document.getElementById('saveBtn');
+            const btn = document.getElementById('saveBtn'); btn.disabled = true; btn.innerText = "...";
             try {
-                btn.disabled = true; btn.innerText = "...";
-                
-                const saveData = {
-                    world: JSON.stringify(world),
-                    inventory: JSON.stringify(inventory),
-                    playerData: JSON.stringify({ x: player.x, y: player.y, hp: player.hp }),
-                    time: timeTicks,
-                    timestamp: new Date()
-                };
-
-                const worldRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld');
-                await setDoc(worldRef, saveData);
-                showMessage("Game Saved!");
-            } catch (error) {
-                console.error("Save error:", error);
-                showMessage("Failed to save.", true);
-            } finally {
-                btn.disabled = false; btn.innerText = "Save";
-            }
+                await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld'), {
+                    world: JSON.stringify(world), inventory: JSON.stringify(inventory), gameMode: gameMode,
+                    playerData: JSON.stringify({ x: player.x, y: player.y, hp: player.hp, food: player.food }),
+                    time: timeTicks, timestamp: new Date()
+                });
+                showMessage("セーブ完了！");
+            } catch (error) { console.error(error); showMessage("セーブ失敗", true); }
+            finally { btn.disabled = false; btn.innerText = "セーブ"; }
         });
 
-        // Load World
-        document.getElementById('loadBtn').addEventListener('click', async () => {
+        document.getElementById('btnLoadGame').addEventListener('click', async () => {
             if (!currentUser) return;
-            const btn = document.getElementById('loadBtn');
+            const btn = document.getElementById('btnLoadGame'); btn.disabled = true; btn.innerText = "ロード中...";
             try {
-                btn.disabled = true; btn.innerText = "...";
-
-                const worldRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld');
-                const docSnap = await getDoc(worldRef);
-
+                const docSnap = await getDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld'));
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     world = JSON.parse(data.world);
                     inventory = JSON.parse(data.inventory);
+                    gameMode = data.gameMode || 'survival';
                     let pData = JSON.parse(data.playerData);
-                    player.x = pData.x; player.y = pData.y; player.hp = pData.hp;
-                    timeTicks = data.time || 0;
-                    mobs = []; drops = []; player.dead = false;
-                    
-                    updateUI();
-                    renderInventory();
-                    showMessage("Game Loaded!");
-                } else {
-                    showMessage("No save found.", true);
-                }
-            } catch (error) {
-                console.error("Load error:", error);
-                showMessage("Failed to load.", true);
-            } finally {
-                btn.disabled = false; btn.innerText = "Load";
-            }
+                    player.x = pData.x; player.y = pData.y; player.hp = pData.hp; player.food = pData.food || 20;
+                    timeTicks = data.time || 0; mobs = []; drops = []; player.dead = false;
+                    startGame(gameMode);
+                    showMessage("ロード完了！");
+                } else { alert("セーブデータがありません。"); }
+            } catch (error) { console.error(error); alert("ロード失敗"); }
+            finally { btn.disabled = false; btn.innerText = "ワールドをロード"; }
         });
 
     </script>
