@@ -306,8 +306,26 @@
             }
 
             // Init Player
-            player.x = (WORLD_COLS / 2) * TILE_SIZE;
-            player.y = (heights[WORLD_COLS/2] - 2) * TILE_SIZE;
+            let spawnX = Math.floor(WORLD_COLS / 2);
+            let spawnY = heights[spawnX] - 2;
+            
+            // 上に向かって空きスペースを探す（木や地形に埋まらないように）
+            while (spawnY >= 0) {
+                let b = world[spawnY][spawnX];
+                let isSolid = b !== 0 && ITEMS[b] && ITEMS[b].solid !== false;
+                if (!isSolid) {
+                    // 頭上のブロックも確認
+                    let bAbove = spawnY > 0 ? world[spawnY - 1][spawnX] : 0;
+                    let isSolidAbove = bAbove !== 0 && ITEMS[bAbove] && ITEMS[bAbove].solid !== false;
+                    if (!isSolidAbove) {
+                        break; // プレイヤーの2ブロック分が空いている
+                    }
+                }
+                spawnY--;
+            }
+
+            player.x = spawnX * TILE_SIZE;
+            player.y = spawnY * TILE_SIZE;
             player.hp = player.maxHp;
             player.dead = false;
             
@@ -596,18 +614,24 @@
             if(camera.y > WORLD_ROWS * TILE_SIZE - canvas.height) camera.y = WORLD_ROWS * TILE_SIZE - canvas.height;
         }
 
-        // --- Interaction (Mining, Placing, Attacking) ---
-        canvas.addEventListener('mousedown', (e) => {
+        let mouseX = 0;
+        let mouseY = 0;
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        function handleInteraction(isPlacing) {
             if(!currentUser || player.dead || invModal.style.display === 'flex') return;
 
-            const mx = e.clientX + camera.x;
-            const my = e.clientY + camera.y;
+            const mx = mouseX + camera.x;
+            const my = mouseY + camera.y;
 
             let heldItem = inventory[hotbarSelection];
             let tool = heldItem ? ITEMS[heldItem.id] : null;
 
-            // 1. Attack Mobs (Left Click)
-            if (e.button === 0) {
+            // 1. Attack Mobs (When Placing / Left Click / K key)
+            if (isPlacing) {
                 for (let i = 0; i < mobs.length; i++) {
                     let m = mobs[i];
                     if (mx >= m.x && mx <= m.x + m.w && my >= m.y && my <= m.y + m.h) {
@@ -617,7 +641,7 @@
                         m.hp -= dmg;
                         m.vxTarget = (m.x > player.x) ? 4 : -4;
                         m.vy = -3;
-                        return; // Did attack, don't mine
+                        return; // Did attack, don't interact with blocks
                     }
                 }
             }
@@ -632,11 +656,10 @@
             let dist = Math.hypot((tx*TILE_SIZE+10) - (player.x+player.w/2), (ty*TILE_SIZE+10) - (player.y+player.h/2));
             if(dist > TILE_SIZE * 5) return;
 
-            if (e.button === 2) {
-                // Right Click: Mine / Use Bed
+            if (!isPlacing) {
+                // Right Click / L key: Mine / Use Bed
                 let bId = world[ty][tx];
                 
-                // If clicking a Bed
                 if (bId === 10) {
                     if (isNight) {
                         timeTicks = 0; // Skip to morning
@@ -647,30 +670,27 @@
                     return;
                 }
 
-                // Mine Block
                 if (bId !== 0 && ITEMS[bId] && !ITEMS[bId].liquid) {
                     let blockInfo = ITEMS[bId];
 
-                    // Check tool requirement
                     let canMine = true;
                     if (blockInfo.reqTool) {
-                        if(!tool || tool.id !== 22) { // 22 is Stone Pickaxe (ダイヤ等の追加対応時はID要確認)
+                        if(!tool || (tool.id !== 22 && tool.id !== 29 && tool.id !== 30)) {
                             canMine = false;
                             showMessage("Requires proper Pickaxe!", true);
                         }
                     }
 
                     if (canMine) {
-                        world[ty][tx] = 0; // Break
+                        world[ty][tx] = 0; 
                         if (blockInfo.drop) spawnDrop(blockInfo.drop, tx*TILE_SIZE + 4, ty*TILE_SIZE + 4);
                     }
                 }
-            } else if (e.button === 0) {
-                // Left Click: Place
+            } else {
+                // Left Click / K key: Place
                 let bId = world[ty][tx];
                 
                 if (bId === 0 || (ITEMS[bId] && ITEMS[bId].liquid)) {
-                    // Place block on Left Click if holding a block
                     if (heldItem && ITEMS[heldItem.id].type === 'block') {
                         let pRect = { left: player.x, right: player.x+player.w, top: player.y, bottom: player.y+player.h };
                         let bRect = { left: tx*TILE_SIZE, right: tx*TILE_SIZE+TILE_SIZE, top: ty*TILE_SIZE, bottom: ty*TILE_SIZE+TILE_SIZE };
@@ -682,6 +702,14 @@
                     }
                 }
             }
+        }
+
+        // --- Interaction (Mining, Placing, Attacking) ---
+        canvas.addEventListener('mousedown', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (e.button === 2) handleInteraction(false); // Right Click: Mine
+            else if (e.button === 0) handleInteraction(true); // Left Click: Place
         });
         canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -697,6 +725,24 @@
                 else {
                     invModal.style.display = 'flex';
                     renderInventory();
+                }
+            }
+            if (e.code === 'KeyK') {
+                handleInteraction(true); // 置く
+            }
+            if (e.code === 'KeyL') {
+                handleInteraction(false); // 掘る
+            }
+            if (e.code === 'KeyQ') {
+                // アイテムを捨てる
+                let heldItem = inventory[hotbarSelection];
+                if (heldItem && heldItem.count > 0) {
+                    removeFromInventory(heldItem.id, 1);
+                    // プレイヤーの少し前にドロップさせる
+                    let dropX = player.facingRight ? player.x + player.w + 5 : player.x - 15;
+                    let dropY = player.y + player.h / 2;
+                    let id = heldItem.id;
+                    drops.push({ id, x: dropX, y: dropY, w: 8, h: 8, vx: (player.facingRight ? 3 : -3), vy: -2, life: 600 });
                 }
             }
         });
