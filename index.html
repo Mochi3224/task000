@@ -179,7 +179,10 @@
             25: { id: 25, name: 'Pork', color: '#F48FB1', type: 'item' },
             26: { id: 26, name: 'Wool', color: '#EEEEEE', type: 'item' },
             27: { id: 27, name: 'Beef', color: '#D32F2F', type: 'item' },
-            28: { id: 28, name: 'Chicken Meat', color: '#FFCC80', type: 'item' }
+            28: { id: 28, name: 'Chicken Meat', color: '#FFCC80', type: 'item' },
+            29: { id: 29, name: 'Iron Pickaxe', color: '#E0E0E0', type: 'tool', toolType: 'pick', tier: 3, dmg: 5 },
+            30: { id: 30, name: 'Diamond Pickaxe', color: '#84FFFF', type: 'tool', toolType: 'pick', tier: 4, dmg: 7 },
+            31: { id: 31, name: 'Wood Sword', color: '#A1887F', type: 'tool', toolType: 'sword', tier: 1, dmg: 4 }
         };
 
         const RECIPES = [
@@ -187,7 +190,10 @@
             { result: {id: 20, count: 4}, req: [{id: 11, count: 2}], name: 'Stick x4' }, // Planks -> Sticks
             { result: {id: 21, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: 'Wood Pickaxe' },
             { result: {id: 22, count: 1}, req: [{id: 3, count: 3}, {id: 20, count: 2}], name: 'Stone Pickaxe' },
+            { result: {id: 29, count: 1}, req: [{id: 8, count: 3}, {id: 20, count: 2}], name: 'Iron Pickaxe' },
+            { result: {id: 30, count: 1}, req: [{id: 9, count: 3}, {id: 20, count: 2}], name: 'Diamond Pickaxe' },
             { result: {id: 23, count: 1}, req: [{id: 11, count: 3}, {id: 20, count: 2}], name: 'Wood Axe' },
+            { result: {id: 31, count: 1}, req: [{id: 11, count: 2}, {id: 20, count: 1}], name: 'Wood Sword' },
             { result: {id: 24, count: 1}, req: [{id: 3, count: 2}, {id: 20, count: 1}], name: 'Stone Sword' },
             { result: {id: 10, count: 1}, req: [{id: 26, count: 3}, {id: 11, count: 3}], name: 'Bed' }
         ];
@@ -198,8 +204,9 @@
         let isNight = false;
         
         // Exactly 1 block jump: v = 4.5, g = 0.5 => Height = 20.25px (1 block = 20px)
+        // 2 block jump: v = 6.5, g = 0.5 => Height = 42.25px (2 blocks = 40px)
         const GRAVITY = 0.5;
-        const JUMP_VEL = -4.5;
+        const JUMP_VEL = -6.5;
         const MAX_FALL = 10;
 
         let player = {
@@ -625,39 +632,8 @@
             let dist = Math.hypot((tx*TILE_SIZE+10) - (player.x+player.w/2), (ty*TILE_SIZE+10) - (player.y+player.h/2));
             if(dist > TILE_SIZE * 5) return;
 
-            if (e.button === 0) {
-                // Left Click: Mine OR Place
-                let bId = world[ty][tx];
-                if (bId !== 0 && ITEMS[bId] && !ITEMS[bId].liquid) {
-                    let blockInfo = ITEMS[bId];
-
-                    // Check tool requirement
-                    let canMine = true;
-                    if (blockInfo.reqTool) {
-                        if(!tool || tool.id !== 22) { // 22 is Stone Pickaxe
-                            canMine = false;
-                            showMessage("Requires Stone Pickaxe!", true);
-                        }
-                    }
-
-                    if (canMine) {
-                        world[ty][tx] = 0; // Break
-                        if (blockInfo.drop) spawnDrop(blockInfo.drop, tx*TILE_SIZE + 4, ty*TILE_SIZE + 4);
-                    }
-                } else if (bId === 0 || (ITEMS[bId] && ITEMS[bId].liquid)) {
-                    // Place block on Left Click if holding a block
-                    if (heldItem && ITEMS[heldItem.id].type === 'block') {
-                        let pRect = { left: player.x, right: player.x+player.w, top: player.y, bottom: player.y+player.h };
-                        let bRect = { left: tx*TILE_SIZE, right: tx*TILE_SIZE+TILE_SIZE, top: ty*TILE_SIZE, bottom: ty*TILE_SIZE+TILE_SIZE };
-                        
-                        if (!(pRect.right > bRect.left && pRect.left < bRect.right && pRect.bottom > bRect.top && pRect.top < bRect.bottom)) {
-                            world[ty][tx] = heldItem.id;
-                            removeFromInventory(heldItem.id, 1);
-                        }
-                    }
-                }
-            } else if (e.button === 2) {
-                // Right Click: Place / Use
+            if (e.button === 2) {
+                // Right Click: Mine / Use Bed
                 let bId = world[ty][tx];
                 
                 // If clicking a Bed
@@ -671,10 +647,31 @@
                     return;
                 }
 
-                // Placing blocks
-                if (bId === 0 || ITEMS[bId].liquid) {
+                // Mine Block
+                if (bId !== 0 && ITEMS[bId] && !ITEMS[bId].liquid) {
+                    let blockInfo = ITEMS[bId];
+
+                    // Check tool requirement
+                    let canMine = true;
+                    if (blockInfo.reqTool) {
+                        if(!tool || tool.id !== 22) { // 22 is Stone Pickaxe (ダイヤ等の追加対応時はID要確認)
+                            canMine = false;
+                            showMessage("Requires proper Pickaxe!", true);
+                        }
+                    }
+
+                    if (canMine) {
+                        world[ty][tx] = 0; // Break
+                        if (blockInfo.drop) spawnDrop(blockInfo.drop, tx*TILE_SIZE + 4, ty*TILE_SIZE + 4);
+                    }
+                }
+            } else if (e.button === 0) {
+                // Left Click: Place
+                let bId = world[ty][tx];
+                
+                if (bId === 0 || (ITEMS[bId] && ITEMS[bId].liquid)) {
+                    // Place block on Left Click if holding a block
                     if (heldItem && ITEMS[heldItem.id].type === 'block') {
-                        // Prevent placing inside player
                         let pRect = { left: player.x, right: player.x+player.w, top: player.y, bottom: player.y+player.h };
                         let bRect = { left: tx*TILE_SIZE, right: tx*TILE_SIZE+TILE_SIZE, top: ty*TILE_SIZE, bottom: ty*TILE_SIZE+TILE_SIZE };
                         
