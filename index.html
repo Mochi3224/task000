@@ -86,8 +86,8 @@
             <!-- Controls Helper -->
             <div class="absolute top-20 left-4 text-white text-xs drop-shadow-md bg-black bg-opacity-50 p-2 rounded">
                 [W/A/S/D] Move & Jump<br>
-                [Left Click] Attack / Mine<br>
-                [Right Click] Place Block / Sleep<br>
+                [Left Click] Attack / Mine / Place<br>
+                [Right Click] Place / Sleep<br>
                 [E] Inventory & Crafting<br>
                 [1-9] Select Item
             </div>
@@ -158,7 +158,7 @@
         // Dictionary of blocks and items
         const ITEMS = {
             0: { id: 0, name: 'Air', solid: false },
-            1: { id: 1, name: 'Grass', color: '#4CAF50', type: 'block', drop: 2 },
+            1: { id: 1, name: 'Grass', color: '#4CAF50', type: 'block', drop: 1 },
             2: { id: 2, name: 'Dirt', color: '#795548', type: 'block', drop: 2 },
             3: { id: 3, name: 'Stone', color: '#9E9E9E', type: 'block', drop: 3 }, // drops stone/cobble
             4: { id: 4, name: 'Wood Log', color: '#5D4037', type: 'block', drop: 4 },
@@ -460,7 +460,22 @@
                         player.vy = JUMP_VEL;
                         player.grounded = false;
                     } else if (player.inWater) {
-                        player.vy = JUMP_VEL * 0.6; // Swim up
+                        let headInWater = false;
+                        let ty = Math.floor(player.y / TILE_SIZE);
+                        let tx1 = Math.floor(player.x / TILE_SIZE);
+                        let tx2 = Math.floor((player.x + player.w - 0.01) / TILE_SIZE);
+                        if (ty >= 0 && ty < WORLD_ROWS) {
+                            for(let x = tx1; x <= tx2; x++) {
+                                let b = world[ty][x];
+                                if(b !== 0 && ITEMS[b] && ITEMS[b].liquid) headInWater = true;
+                            }
+                        }
+                        
+                        if (headInWater) {
+                            player.vy = JUMP_VEL * 0.6; // Swim up
+                        } else {
+                            player.vy = JUMP_VEL; // Pop out of water
+                        }
                     }
                 }
 
@@ -611,11 +626,10 @@
             if(dist > TILE_SIZE * 5) return;
 
             if (e.button === 0) {
-                // Left Click: Mine
+                // Left Click: Mine OR Place
                 let bId = world[ty][tx];
-                if (bId !== 0 && ITEMS[bId]) {
+                if (bId !== 0 && ITEMS[bId] && !ITEMS[bId].liquid) {
                     let blockInfo = ITEMS[bId];
-                    if(blockInfo.liquid) return; // can't mine water
 
                     // Check tool requirement
                     let canMine = true;
@@ -629,6 +643,17 @@
                     if (canMine) {
                         world[ty][tx] = 0; // Break
                         if (blockInfo.drop) spawnDrop(blockInfo.drop, tx*TILE_SIZE + 4, ty*TILE_SIZE + 4);
+                    }
+                } else if (bId === 0 || (ITEMS[bId] && ITEMS[bId].liquid)) {
+                    // Place block on Left Click if holding a block
+                    if (heldItem && ITEMS[heldItem.id].type === 'block') {
+                        let pRect = { left: player.x, right: player.x+player.w, top: player.y, bottom: player.y+player.h };
+                        let bRect = { left: tx*TILE_SIZE, right: tx*TILE_SIZE+TILE_SIZE, top: ty*TILE_SIZE, bottom: ty*TILE_SIZE+TILE_SIZE };
+                        
+                        if (!(pRect.right > bRect.left && pRect.left < bRect.right && pRect.bottom > bRect.top && pRect.top < bRect.bottom)) {
+                            world[ty][tx] = heldItem.id;
+                            removeFromInventory(heldItem.id, 1);
+                        }
                     }
                 }
             } else if (e.button === 2) {
