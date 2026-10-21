@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D WebCraft</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #222; color: white; font-family: 'Inter', sans-serif; }
+        #gameCanvas {
+            background-color: #87CEEB; /* Sky blue */
+            image-rendering: pixelated;
+            cursor: crosshair;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 2px solid #555;
+            border-radius: 4px;
+        }
+        .toolbar-btn {
+            transition: all 0.2s;
+        }
+        .toolbar-btn.selected {
+            border-color: white;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen items-center justify-center">
+
+    <!-- Login UI -->
+    <div id="loginUI" class="flex flex-col items-center justify-center space-y-6 bg-gray-800 p-10 rounded-xl shadow-2xl">
+        <h1 class="text-4xl font-bold text-green-400 mb-2">2D WebCraft</h1>
+        <p class="text-gray-300">Sign in to start building and save your worlds.</p>
+        <button id="loginBtn" class="flex items-center gap-2 bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow">
+            <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/><path fill="none" d="M1 1h22v22H1z"/></svg>
+            Sign in with Google
+        </button>
+        <div id="loginError" class="text-red-400 text-sm hidden"></div>
+    </div>
+
+    <!-- Game UI (Hidden initially) -->
+    <div id="gameUI" class="hidden flex-col items-center w-full h-full p-4">
+        
+        <!-- Top bar: User info & Save/Load -->
+        <div class="flex justify-between items-center w-full max-w-5xl mb-4 bg-gray-800 p-3 rounded-lg shadow">
+            <div class="flex items-center gap-3">
+                <img id="userAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full hidden">
+                <span id="userName" class="font-medium text-gray-200"></span>
+            </div>
+            <div class="flex gap-2">
+                <button id="saveBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium transition text-sm">Save World</button>
+                <button id="loadBtn" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-medium transition text-sm">Load World</button>
+                <button id="logoutBtn" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-medium transition text-sm ml-4">Logout</button>
+            </div>
+        </div>
+
+        <div id="statusMessage" class="text-yellow-300 text-sm mb-2 h-5 font-mono"></div>
+
+        <!-- Canvas -->
+        <canvas id="gameCanvas" width="1000" height="600"></canvas>
+
+        <!-- Toolbar -->
+        <div class="flex gap-4 mt-6 bg-gray-800 p-3 rounded-lg shadow-lg">
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn selected cursor-pointer" style="background-color: #4CAF50;" data-block="1"></div>
+                <span class="text-xs mt-1 text-gray-400">Grass</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #795548;" data-block="2"></div>
+                <span class="text-xs mt-1 text-gray-400">Dirt</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #9E9E9E;" data-block="3"></div>
+                <span class="text-xs mt-1 text-gray-400">Stone</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #8D6E63;" data-block="4"></div>
+                <span class="text-xs mt-1 text-gray-400">Wood</span>
+            </div>
+            <div class="w-px h-12 bg-gray-600 mx-2"></div> <!-- Divider -->
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-gray-400 toolbar-btn cursor-pointer flex items-center justify-center bg-gray-900" data-block="0">
+                    <span class="text-red-500 font-bold">X</span>
+                </div>
+                <span class="text-xs mt-1 text-gray-400">Eraser</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Provided Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDBqw6kx_1fMunXjmC79OfEPrtEwbk6CGM",
+            authDomain: "task000.firebaseapp.com",
+            projectId: "task000",
+            storageBucket: "task000.firebasestorage.app",
+            messagingSenderId: "776947135197",
+            appId: "1:776947135197:web:11a0daad931efbfe41a134"
+        };
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : '2d-minecraft-clone';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        // UI Elements
+        const loginUI = document.getElementById('loginUI');
+        const gameUI = document.getElementById('gameUI');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userNameEl = document.getElementById('userName');
+        const userAvatarEl = document.getElementById('userAvatar');
+        const loginError = document.getElementById('loginError');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const cols = 50;
+        const rows = 30;
+        const tileSize = 20;
+        
+        let world = [];
+        let currentBlockType = 1; // Default to Grass
+        let isDrawing = false;
+
+        // Block Colors Mapping
+        const blockColors = {
+            0: null, // Empty / Sky
+            1: '#4CAF50', // Grass
+            2: '#795548', // Dirt
+            3: '#9E9E9E', // Stone
+            4: '#8D6E63'  // Wood
+        };
+
+        // Initialize empty world
+        function initWorld() {
+            world = [];
+            for (let y = 0; y < rows; y++) {
+                let row = [];
+                for (let x = 0; x < cols; x++) {
+                    // Generate basic terrain
+                    if (y > 20) row.push(2); // Dirt bottom
+                    else if (y === 20) row.push(1); // Grass surface
+                    else row.push(0); // Air
+                }
+                world.push(row);
+            }
+        }
+
+        // Draw the world
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear to background (sky)
+            
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const block = world[y][x];
+                    if (block !== 0) {
+                        ctx.fillStyle = blockColors[block];
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        // Optional block border
+                        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                        ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+        }
+
+        // Handle drawing on canvas
+        function placeBlock(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = Math.floor(((e.clientX - rect.left) * scaleX) / tileSize);
+            const y = Math.floor(((e.clientY - rect.top) * scaleY) / tileSize);
+
+            if (x >= 0 && x < cols && y >= 0 && y < rows) {
+                if (world[y][x] !== currentBlockType) {
+                    world[y][x] = currentBlockType;
+                    draw();
+                }
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            placeBlock(e);
+        });
+        canvas.addEventListener('mousemove', placeBlock);
+        window.addEventListener('mouseup', () => isDrawing = false);
+
+        // Toolbar Logic
+        const toolbarBtns = document.querySelectorAll('.toolbar-btn');
+        toolbarBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                toolbarBtns.forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                currentBlockType = parseInt(btn.dataset.block);
+            });
+        });
+
+        // --- Auth & Data Logic ---
+
+        function showMessage(msg, isError = false) {
+            statusMessage.textContent = msg;
+            statusMessage.className = `text-sm mb-2 h-5 font-mono ${isError ? 'text-red-400' : 'text-yellow-300'}`;
+            setTimeout(() => { statusMessage.textContent = ''; }, 3000);
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loginUI.classList.add('hidden');
+                gameUI.classList.remove('hidden');
+                gameUI.classList.add('flex');
+                
+                userNameEl.textContent = user.displayName || user.email;
+                if (user.photoURL) {
+                    userAvatarEl.src = user.photoURL;
+                    userAvatarEl.classList.remove('hidden');
+                }
+
+                initWorld();
+                draw();
+            } else {
+                currentUser = null;
+                loginUI.classList.remove('hidden');
+                gameUI.classList.add('hidden');
+                gameUI.classList.remove('flex');
+                userAvatarEl.classList.add('hidden');
+            }
+        });
+
+        loginBtn.addEventListener('click', async () => {
+            try {
+                loginError.classList.add('hidden');
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Login failed:", error);
+                if (error.code === 'auth/unauthorized-domain') {
+                    loginError.innerHTML = "Login failed: Unauthorized domain.<br/>Please add this website's domain to your Firebase Console:<br/><b>Authentication > Settings > Authorized domains</b>.";
+                } else {
+                    loginError.textContent = "Login failed. Ensure popups are allowed or try again.";
+                }
+                loginError.classList.remove('hidden');
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => signOut(auth));
+
+        // Save Data to Firestore
+        saveBtn.addEventListener('click', async () => {
+            if (!currentUser) return;
+            try {
+                saveBtn.disabled = true;
+                saveBtn.innerText = "Saving...";
+                
+                // Using compliant artifact path structure
+                const worldRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld');
+                const worldData = JSON.stringify(world); // Compress slightly by serializing
+                
+                await setDoc(worldRef, { 
+                    data: worldData,
+                    timestamp: new Date()
+                });
+                
+                showMessage("World saved successfully!");
+            } catch (error) {
+                console.error("Error saving world:", error);
+                showMessage("Failed to save world.", true);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerText = "Save World";
+            }
+        });
+
+        // Load Data from Firestore
+        loadBtn.addEventListener('click', async () => {
+            if (!currentUser) return;
+            try {
+                loadBtn.disabled = true;
+                loadBtn.innerText = "Loading...";
+
+                const worldRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'savedGames', 'myWorld');
+                const docSnap = await getDoc(worldRef);
+
+                if (docSnap.exists()) {
+                    const loadedData = JSON.parse(docSnap.data().data);
+                    // Basic validation
+                    if (loadedData.length === rows && loadedData[0].length === cols) {
+                        world = loadedData;
+                        draw();
+                        showMessage("World loaded!");
+                    } else {
+                        showMessage("Saved data format is corrupted.", true);
+                    }
+                } else {
+                    showMessage("No saved world found.", true);
+                }
+            } catch (error) {
+                console.error("Error loading world:", error);
+                showMessage("Failed to load world.", true);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.innerText = "Load World";
+            }
+        });
+
+        // Initial setup run
+        initWorld();
+        draw();
+
+    </script>
+</body>
+</html>
