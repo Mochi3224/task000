@@ -23,6 +23,9 @@
             transform: scale(1.1);
             box-shadow: 0 0 10px rgba(255,255,255,0.5);
         }
+        #healthBarContainer { width: 300px; height: 20px; background: #333; border: 2px solid #000; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); border-radius: 10px; overflow: hidden; z-index: 10; }
+        #healthBar { height: 100%; background: #E53935; width: 100%; transition: width 0.2s; }
+        .relative-container { position: relative; }
     </style>
 </head>
 <body class="flex flex-col h-screen items-center justify-center">
@@ -48,6 +51,7 @@
                 <span id="userName" class="font-medium text-gray-200"></span>
             </div>
             <div class="flex gap-2">
+                <button id="spawnBossBtn" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-medium transition text-sm">Spawn Boss</button>
                 <button id="saveBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium transition text-sm">Save World</button>
                 <button id="loadBtn" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-medium transition text-sm">Load World</button>
                 <button id="logoutBtn" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-medium transition text-sm ml-4">Logout</button>
@@ -56,8 +60,15 @@
 
         <div id="statusMessage" class="text-yellow-300 text-sm mb-2 h-5 font-mono"></div>
 
-        <!-- Canvas -->
-        <canvas id="gameCanvas" width="1000" height="600"></canvas>
+        <!-- Canvas and Overlay -->
+        <div class="relative-container shadow-2xl">
+            <div id="healthBarContainer" class="hidden"><div id="healthBar"></div></div>
+            <canvas id="gameCanvas" width="1000" height="600"></canvas>
+            <div id="deathScreen" class="hidden absolute inset-0 bg-red-900 bg-opacity-80 flex flex-col items-center justify-center text-white text-6xl font-bold rounded pointer-events-none transition-opacity">
+                YOU DIED
+                <span class="text-xl mt-4 text-gray-300">Respawning...</span>
+            </div>
+        </div>
 
         <!-- Toolbar -->
         <div class="flex gap-4 mt-6 bg-gray-800 p-3 rounded-lg shadow-lg">
@@ -76,6 +87,14 @@
             <div class="flex flex-col items-center">
                 <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #8D6E63;" data-block="4"></div>
                 <span class="text-xs mt-1 text-gray-400">Wood</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #2E7D32;" data-block="5"></div>
+                <span class="text-xs mt-1 text-gray-400">Leaves</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded border-2 border-transparent toolbar-btn cursor-pointer" style="background-color: #FDD835;" data-block="6"></div>
+                <span class="text-xs mt-1 text-gray-400">Sand</span>
             </div>
             <div class="w-px h-12 bg-gray-600 mx-2"></div> <!-- Divider -->
             <div class="flex flex-col items-center">
@@ -135,6 +154,27 @@
         let world = [];
         let currentBlockType = 1; // Default to Grass
         let isDrawing = false;
+        let rightClicking = false;
+
+        // Survival & Entity Variables
+        let player = { x: 500, y: 100, w: 14, h: 26, vx: 0, vy: 0, speed: 4, jump: -8.5, hp: 100, maxHp: 100, dead: false, deathTicks: 0, facingRight: true };
+        let mobs = [];
+        let keys = {};
+        let gameLoopId;
+        const gravity = 0.4;
+        const maxFallSpeed = 12;
+
+        const healthBarContainer = document.getElementById('healthBarContainer');
+        const healthBar = document.getElementById('healthBar');
+        const deathScreen = document.getElementById('deathScreen');
+        const spawnBossBtn = document.getElementById('spawnBossBtn');
+
+        // Input Listeners for Player
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        // Prevent context menu on right click for erasing
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
 
         // Block Colors Mapping
         const blockColors = {
@@ -142,8 +182,14 @@
             1: '#4CAF50', // Grass
             2: '#795548', // Dirt
             3: '#9E9E9E', // Stone
-            4: '#8D6E63'  // Wood
+            4: '#8D6E63', // Wood
+            5: '#2E7D32', // Leaves
+            6: '#FDD835', // Sand
         };
+
+        function updateHealthUI() {
+            if(healthBar) healthBar.style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+        }
 
         // Initialize empty world
         function initWorld() {
@@ -151,57 +197,275 @@
             for (let y = 0; y < rows; y++) {
                 let row = [];
                 for (let x = 0; x < cols; x++) {
-                    // Generate basic terrain
                     if (y > 20) row.push(2); // Dirt bottom
                     else if (y === 20) row.push(1); // Grass surface
                     else row.push(0); // Air
                 }
                 world.push(row);
             }
+            player = { x: 500, y: 100, w: 14, h: 26, vx: 0, vy: 0, speed: 4, jump: -8.5, hp: 100, maxHp: 100, dead: false, deathTicks: 0, facingRight: true };
+            mobs = [];
+            if(deathScreen) deathScreen.classList.add('hidden');
+            updateHealthUI();
         }
+
+        // --- Physics & Collision ---
+        function checkTileCollision(ent) {
+            let left = Math.floor(ent.x / tileSize);
+            let right = Math.floor((ent.x + ent.w - 0.01) / tileSize);
+            let top = Math.floor(ent.y / tileSize);
+            let bottom = Math.floor((ent.y + ent.h - 0.01) / tileSize);
+
+            if (left < 0 || right >= cols || top < 0 || bottom >= rows) return true;
+
+            for (let y = top; y <= bottom; y++) {
+                for (let x = left; x <= right; x++) {
+                    if (world[y] && world[y][x] !== 0) return true;
+                }
+            }
+            return false;
+        }
+
+        function moveEntity(ent, dx, dy) {
+            ent.x += dx;
+            if (checkTileCollision(ent)) {
+                ent.x -= dx; // Revert X
+                ent.vx = 0;
+                if(ent.type === 'zombie' || ent.type === 'boss') ent.vxTarget *= -1; // Mobs turn around
+            }
+            
+            ent.y += dy;
+            if (checkTileCollision(ent)) {
+                ent.y -= dy; // Revert Y
+                if (dy > 0) {
+                    ent.vy = 0;
+                    ent.grounded = true;
+                } else if (dy < 0) {
+                    ent.vy = 0;
+                }
+            } else {
+                ent.grounded = false;
+            }
+        }
+
+        // --- Game Loop ---
+        function update() {
+            if (!currentUser) return;
+
+            // Player Physics
+            if (!player.dead) {
+                // Movement
+                if (keys['KeyA'] || keys['ArrowLeft']) { player.vx = -player.speed; player.facingRight = false; }
+                else if (keys['KeyD'] || keys['ArrowRight']) { player.vx = player.speed; player.facingRight = true; }
+                else { player.vx = 0; }
+
+                // Jumping
+                if ((keys['KeyW'] || keys['ArrowUp'] || keys['Space']) && player.grounded) {
+                    player.vy = player.jump;
+                    player.grounded = false;
+                }
+
+                player.vy += gravity;
+                if (player.vy > maxFallSpeed) player.vy = maxFallSpeed;
+
+                moveEntity(player, player.vx, player.vy);
+
+                // Check death by falling out of world
+                if (player.y > canvas.height) player.hp = 0;
+
+                if (player.hp <= 0) {
+                    player.dead = true;
+                    player.vy = -12; // Death jump
+                    deathScreen.classList.remove('hidden');
+                    setTimeout(() => initWorld(), 3500); // Respawn after 3.5s
+                }
+            } else {
+                // Dead motion (Fly up and rotate)
+                player.y += player.vy;
+                player.x += player.vx;
+                player.vy += gravity;
+                player.deathTicks++;
+            }
+
+            // Mobs Logic
+            for (let i = mobs.length - 1; i >= 0; i--) {
+                let m = mobs[i];
+                
+                // Basic AI
+                if (!m.vxTarget) m.vxTarget = (Math.random() > 0.5 ? 1 : -1) * (m.type === 'boss' ? 2 : 1);
+                
+                // Aggro on player if close
+                if (!player.dead && Math.abs(m.x - player.x) < 400) {
+                    m.vxTarget = m.x < player.x ? (m.type === 'boss' ? 2 : 1) : -(m.type === 'boss' ? 2 : 1);
+                    // Boss jumps occasionally
+                    if (m.type === 'boss' && m.grounded && Math.random() < 0.02) m.vy = -9;
+                    // Zombie jumps if blocked
+                    if (m.type === 'zombie' && m.grounded && m.vx === 0 && Math.random() < 0.1) m.vy = -6;
+                }
+
+                m.vx = m.vxTarget;
+                m.vy += gravity;
+                if (m.vy > maxFallSpeed) m.vy = maxFallSpeed;
+
+                moveEntity(m, m.vx, m.vy);
+
+                // Damage player on touch
+                if (!player.dead && m.hp > 0) {
+                    if (player.x < m.x + m.w && player.x + player.w > m.x && player.y < m.y + m.h && player.y + player.h > m.y) {
+                        player.hp -= (m.type === 'boss' ? 2 : 0.5);
+                        updateHealthUI();
+                        // Knockback
+                        player.vx = (player.x > m.x) ? 5 : -5;
+                        player.vy = -4;
+                    }
+                }
+
+                // Remove dead mobs or fallen mobs
+                if (m.hp <= 0 || m.y > canvas.height) {
+                    mobs.splice(i, 1);
+                }
+            }
+        }
+
+        function spawnMob(type, x, y) {
+            if(type === 'zombie') mobs.push({ x, y, w: 14, h: 26, vx: 0, vy: 0, vxTarget: 1, hp: 30, maxHp: 30, type: 'zombie', color: '#1B5E20' });
+            if(type === 'boss') mobs.push({ x, y, w: 40, h: 40, vx: 0, vy: 0, vxTarget: 2, hp: 300, maxHp: 300, type: 'boss', color: '#6A1B9A' });
+        }
+
+        spawnBossBtn.addEventListener('click', () => {
+            spawnMob('boss', 500, 50);
+            showMessage("BOSS SPAWNED!", true);
+        });
+
+        // Periodic Zombie Spawn
+        setInterval(() => {
+            if (currentUser && !player.dead && mobs.length < 5) {
+                spawnMob('zombie', Math.random() * (canvas.width - 50), 20);
+            }
+        }, 6000);
 
         // Draw the world
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear to background (sky)
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
             
+            // Draw Tiles
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     const block = world[y][x];
                     if (block !== 0) {
                         ctx.fillStyle = blockColors[block];
                         ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-                        // Optional block border
                         ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                         ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
                     }
                 }
             }
+
+            // Draw Mobs
+            mobs.forEach(m => {
+                ctx.fillStyle = m.color;
+                ctx.fillRect(m.x, m.y, m.w, m.h);
+                // Health bar for mobs
+                ctx.fillStyle = 'black';
+                ctx.fillRect(m.x, m.y - 8, m.w, 4);
+                ctx.fillStyle = 'red';
+                ctx.fillRect(m.x, m.y - 8, m.w * (m.hp / m.maxHp), 4);
+            });
+
+            // Draw Player
+            ctx.save();
+            if (player.dead) {
+                ctx.translate(player.x + player.w/2, player.y + player.h/2);
+                ctx.rotate(player.deathTicks * 0.2);
+                ctx.translate(-(player.x + player.w/2), -(player.y + player.h/2));
+            }
+            
+            // Player body parts
+            ctx.fillStyle = '#0288D1'; // Blue shirt
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.fillStyle = '#FFB74D'; // Skin head
+            ctx.fillRect(player.x + 2, player.y - 8, 10, 10);
+            
+            // Eyes direction
+            ctx.fillStyle = 'black';
+            if (player.facingRight) {
+                ctx.fillRect(player.x + 8, player.y - 6, 2, 2);
+            } else {
+                ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
+            }
+            ctx.restore();
         }
 
-        // Handle drawing on canvas
-        function placeBlock(e) {
-            if (!isDrawing) return;
+        function gameLoop() {
+            update();
+            draw();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        // Handle mouse click (Combat & Building)
+        function handleMouseAction(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
 
-            const x = Math.floor(((e.clientX - rect.left) * scaleX) / tileSize);
-            const y = Math.floor(((e.clientY - rect.top) * scaleY) / tileSize);
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            // Combat Check (Click on mob to attack)
+            if (e.type === 'mousedown') {
+                let hitMob = false;
+                for (let i = 0; i < mobs.length; i++) {
+                    let m = mobs[i];
+                    if (mx >= m.x - 10 && mx <= m.x + m.w + 10 && my >= m.y - 10 && my <= m.y + m.h + 10) {
+                        m.hp -= 15; // Attack damage
+                        m.vxTarget = (m.x > player.x) ? 6 : -6;
+                        m.vy = -4; // knockback
+                        hitMob = true;
+                        
+                        // Hit particle effect
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(mx-5, my-5, 10, 10);
+                        break;
+                    }
+                }
+                if (hitMob) return; // Attack prioritized over placing blocks
+            }
+
+            // Block Placement / Erasing (Right click or Erase Tool)
+            if (!isDrawing && !rightClicking) return;
+            
+            const x = Math.floor(mx / tileSize);
+            const y = Math.floor(my / tileSize);
 
             if (x >= 0 && x < cols && y >= 0 && y < rows) {
-                if (world[y][x] !== currentBlockType) {
-                    world[y][x] = currentBlockType;
-                    draw();
+                let blockToPlace = rightClicking ? 0 : currentBlockType;
+                
+                // Prevent placing blocks inside the player
+                if (blockToPlace !== 0) {
+                    let pLeft = Math.floor(player.x / tileSize);
+                    let pRight = Math.floor((player.x + player.w) / tileSize);
+                    let pTop = Math.floor(player.y / tileSize);
+                    let pBottom = Math.floor((player.y + player.h) / tileSize);
+                    
+                    if (x >= pLeft && x <= pRight && y >= pTop && y <= pBottom) return;
+                }
+
+                if (world[y][x] !== blockToPlace) {
+                    world[y][x] = blockToPlace;
                 }
             }
         }
 
         canvas.addEventListener('mousedown', (e) => {
-            isDrawing = true;
-            placeBlock(e);
+            if (e.button === 2) rightClicking = true; // Right Click for eraser
+            else isDrawing = true;
+            handleMouseAction(e);
         });
-        canvas.addEventListener('mousemove', placeBlock);
-        window.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mousemove', handleMouseAction);
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 2) rightClicking = false;
+            else isDrawing = false;
+        });
 
         // Toolbar Logic
         const toolbarBtns = document.querySelectorAll('.toolbar-btn');
@@ -227,6 +491,7 @@
                 loginUI.classList.add('hidden');
                 gameUI.classList.remove('hidden');
                 gameUI.classList.add('flex');
+                healthBarContainer.classList.remove('hidden');
                 
                 userNameEl.textContent = user.displayName || user.email;
                 if (user.photoURL) {
@@ -235,13 +500,15 @@
                 }
 
                 initWorld();
-                draw();
+                if(!gameLoopId) gameLoopId = requestAnimationFrame(gameLoop);
             } else {
                 currentUser = null;
                 loginUI.classList.remove('hidden');
                 gameUI.classList.add('hidden');
                 gameUI.classList.remove('flex');
+                healthBarContainer.classList.add('hidden');
                 userAvatarEl.classList.add('hidden');
+                if(gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
             }
         });
 
@@ -303,7 +570,6 @@
                     // Basic validation
                     if (loadedData.length === rows && loadedData[0].length === cols) {
                         world = loadedData;
-                        draw();
                         showMessage("World loaded!");
                     } else {
                         showMessage("Saved data format is corrupted.", true);
@@ -322,7 +588,6 @@
 
         // Initial setup run
         initWorld();
-        draw();
 
     </script>
 </body>
