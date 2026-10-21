@@ -19,19 +19,24 @@ button.alt{background:#4285f4}button.gray{background:#666}
 .slot.on{border-color:#fff}.slot canvas{width:100%;height:100%;image-rendering:pixelated}
 .slot b{position:absolute;left:2px;top:0;font-size:10px;color:#fff;text-shadow:0 0 2px #000}
 #hud{position:fixed;top:8px;left:10px;color:#fff;font-size:13px;line-height:1.5;text-shadow:1px 1px 2px #000}
-#name{position:fixed;bottom:70px;width:100%;text-align:center;color:#fff;text-shadow:1px 1px 2px #000}
+#name{position:fixed;bottom:98px;width:100%;text-align:center;color:#fff;text-shadow:1px 1px 2px #000}
 #inv{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#0008}
 #inv div{background:#c6c6c6;border:3px solid #222;padding:12px;display:grid;grid-template-columns:repeat(9,48px);gap:3px}
 #inv canvas{width:48px;height:48px;image-rendering:pixelated;background:#8b8b8b;border:2px solid #555;cursor:pointer;box-sizing:border-box}
 #inv canvas:hover{border-color:#fff}
+#hp{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);color:#e33;font-size:16px;text-shadow:1px 1px 1px #000;display:none}
+#hurt{position:fixed;inset:0;background:#f003;opacity:0;pointer-events:none;transition:opacity .4s}
+.slot i{position:absolute;right:2px;bottom:0;font:bold 12px sans-serif;color:#fff;text-shadow:1px 1px 1px #000}
+button.on{outline:3px solid #fff}
 </style></head><body>
-<canvas id="c"></canvas><div id="cross"></div><div id="prog"><i></i></div><div id="name"></div><div id="bar"></div>
+<canvas id="c"></canvas><div id="cross"></div><div id="prog"><i></i></div><div id="name"></div><div id="hp"></div><div id="hurt"></div><div id="bar"></div>
 <div id="hud"><span id="user">ゲスト</span> / <span id="status">未保存</span><br><span id="info"></span></div>
 <div id="menu"><div class="box">
 <h1>VOXELCRAFT</h1>
-<p style="font-size:13px;line-height:1.7">WASD:移動 Space:ジャンプ(泳ぐ) Shift:ダッシュ<br>左長押し:掘る 右クリック:置く<br>1〜0/ホイール:ブロック選択 E:ブロック一覧<br>F:飛行モード(Space上昇/Shift下降) Esc:メニュー</p>
+<p style="font-size:13px;line-height:1.7">WASD:移動 Space:ジャンプ(泳ぐ) Shift:ダッシュ<br>左長押し:掘る 右クリック:置く<br>1〜0/ホイール:ブロック選択 E:ブロック一覧<br>F:飛行(クリエイティブ)(Space上昇/Shift下降) Esc:メニュー</p>
 <button class="alt" id="login">Googleでログイン</button>
 <button class="gray" id="logout" style="display:none">ログアウト</button><br>
+<div style="margin:8px 0">ゲームモード:<button id="mC" class="on">クリエイティブ</button><button id="mS">サバイバル</button></div>
 <button id="play">ゲームを始める</button>
 <button class="gray" id="save">今すぐ保存</button>
 <p id="msg" style="font-size:12px;color:#ccc">ログインするとワールドが自動保存されます</p>
@@ -123,6 +128,8 @@ const TR={7:1,9:1,10:1};
 const HARD=[0,.6,.5,1.5,1.5,1,.8,.2,.5,.3,0,1.5];
 let HB=[1,2,3,4,5,6,7,8,9,11];
 HARD[35]=5;
+let mode="creative",COUNT={};
+const DROP={1:2,3:4,7:0,9:0,36:0};
 const blockAt=(x,y,z)=>(x<0||z<0||x>=W||z>=W||y<0||y>=H)?0:B[idx(x,y,z)];
 const solid=(x,y,z)=>{if(y<0)return true;if(y>=H)return false;if(x<0||z<0||x>=W||z>=W)return true;const b=B[idx(x,y,z)];return b!==0&&b!==10;};
 function genTerrain(){
@@ -204,21 +211,20 @@ function drawBar(){
   const bar=$('bar');bar.innerHTML='';
   HB.forEach((t,i)=>{
     const d=document.createElement('div');d.className='slot'+(i===cur?' on':'');
-    const c=document.createElement('canvas');c.width=c.height=16;
-    const g=c.getContext('2d');g.drawImage(atlas,(TF[t][3]??TF[t][2])*16,0,16,16,0,0,16,16);
-    d.appendChild(c);const b=document.createElement('b');b.textContent=(i+1)%10;d.appendChild(b);bar.appendChild(d);
+    const n=mode==='survival'?(COUNT[t]||0):1;
+    if(t&&n>0){const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(atlas,(TF[t][3]??TF[t][2])*16,0,16,16,0,0,16,16);d.appendChild(c);
+      if(mode==='survival'){const q=document.createElement('i');q.textContent=n;d.appendChild(q);}}
+    const b=document.createElement('b');b.textContent=(i+1)%10;d.appendChild(b);bar.appendChild(d);
   });
-  $('name').textContent=NAME[HB[cur]];
+  const t=HB[cur];$('name').textContent=(t&&(mode!=='survival'||COUNT[t]>0))?NAME[t]:'';
+  const h=Math.max(0,Math.ceil(P.hp/2));$('hp').style.display=mode==='survival'?'block':'none';$('hp').textContent='❤'.repeat(h)+'♡'.repeat(10-h);
 }
 
-function buildInv(){const g=$('invg');for(let t=1;t<NAME.length;t++){if(t===10)continue;const c=document.createElement('canvas');c.width=c.height=16;c.title=NAME[t];c.getContext('2d').drawImage(atlas,(TF[t][3]??TF[t][2])*16,0,16,16,0,0,16,16);c.onclick=()=>{HB[cur]=t;drawBar();closeInv(true);};g.appendChild(c);}}
+function buildInv(){const g=$('invg');g.innerHTML='';for(let t=1;t<NAME.length;t++){if(t===10)continue;const n=COUNT[t]||0;if(mode==='survival'&&n<=0)continue;const c=document.createElement('canvas');c.width=c.height=32;c.title=NAME[t];const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(atlas,(TF[t][3]??TF[t][2])*16,0,16,16,0,0,32,32);if(mode==='survival'){x.font='bold 12px sans-serif';x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=3;x.strokeText(n,16,30);x.fillText(n,16,30);}c.onclick=()=>{HB[cur]=t;drawBar();closeInv(true);};g.appendChild(c);}}
 function closeInv(relock){inv=false;$('inv').style.display='none';if(relock)canvas.requestPointerLock();else $('menu').style.display='flex';}
 // ---------- player ----------
-const P={x:W/2,y:H,z:W/2,vy:0,yaw:0,pitch:0,ground:false,fly:false};
-const hit=(px,py,pz)=>{
-  for(let x=Math.floor(px-.3);x<=Math.floor(px+.3);x++)for(let y=Math.floor(py);y<=Math.floor(py+1.75);y++)for(let z=Math.floor(pz-.3);z<=Math.floor(pz+.3);z++)if(solid(x,y,z))return true;
-  return false;
-};
+const P={x:W/2,y:H,z:W/2,vy:0,yaw:0,pitch:0,ground:false,fly:false,hp:20,fallY:0};
+const hit=(px,py,pz,hw=.3,hh=1.75)=>{for(let x=Math.floor(px-hw);x<=Math.floor(px+hw);x++)for(let y=Math.floor(py);y<=Math.floor(py+hh);y++)for(let z=Math.floor(pz-hw);z<=Math.floor(pz+hw);z++)if(solid(x,y,z))return true;return false;};
 function spawn(){
   for(let d=0;d<40;d++){
     const x=W/2+d,z=W/2;let y=H-1;while(y>0&&!B[idx(x,y,z)])y--;
@@ -227,9 +233,9 @@ function spawn(){
   P.x=W/2;P.z=W/2;P.y=H-2;
 }
 const keys={};let mining=false,prog=0,tgt=null;
-addEventListener('keydown',e=>{keys[e.code]=true;
-  if(e.code==='KeyF'&&document.pointerLockElement===canvas)P.fly=!P.fly;
-  if(e.code==='KeyE'){if(document.pointerLockElement===canvas){inv=true;$('inv').style.display='flex';document.exitPointerLock();}else if(inv)closeInv(true);}
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();
+  if(e.code==='KeyF'&&document.pointerLockElement===canvas&&mode==='creative')P.fly=!P.fly;
+  if(e.code==='KeyE'){if(document.pointerLockElement===canvas){inv=true;buildInv();$('inv').style.display='flex';document.exitPointerLock();}else if(inv)closeInv(true);}
   if(e.code==='Escape'&&inv)closeInv(false);
   if(/^Digit\d$/.test(e.code)){cur=(+e.code.slice(5)+9)%10;drawBar();}
 });
@@ -251,61 +257,158 @@ function ray(){
 }
 addEventListener('mousedown',e=>{
   if(document.pointerLockElement!==canvas)return;
-  if(e.button===0){mining=true;prog=0;return;}
+  if(e.button===0){const m=mobTarget();if(m){hurtMob(m,mode==='survival'?2:20);return;}mining=true;prog=0;return;}
   if(e.button!==2)return;
   const r=ray();if(!r||!r.prev)return;
+  const t=HB[cur];if(!t||(mode==='survival'&&!(COUNT[t]>0)))return;
   const[px,py,pz]=r.prev,i=idx(px,py,pz);
   if(py<0||py>=H||solid(px,py,pz))return;
-  const old=B[i];B[i]=HB[cur];const bad=hit(P.x,P.y,P.z);B[i]=old;
-  if(!bad)setBlock(px,py,pz,HB[cur]);
+  const old=B[i];B[i]=t;const bad=hit(P.x,P.y,P.z);B[i]=old;
+  if(!bad){setBlock(px,py,pz,t);if(mode==='survival'){COUNT[t]--;drawBar();}}
 });
 addEventListener('mouseup',e=>{if(e.button===0){mining=false;prog=0;}});
 addEventListener('contextmenu',e=>e.preventDefault());
 
 // ---------- loop ----------
+// ---------- crack / items / mobs ----------
+let cool=0,regen=0,spawnT=3;
+const crackC=document.createElement('canvas');crackC.width=160;crackC.height=16;
+{const g=crackC.getContext('2d');g.fillStyle='rgba(0,0,0,.7)';for(let q=0;q<10;q++)for(let y=0;y<16;y++)for(let x=0;x<16;x++)if(hs(x+777,y*3)<.04+q*.07)g.fillRect(q*16+x,y,1,1);}
+const crackTex=new THREE.CanvasTexture(crackC);crackTex.magFilter=crackTex.minFilter=THREE.NearestFilter;crackTex.repeat.set(.1,1);
+const crack=new THREE.Mesh(new THREE.BoxGeometry(1.006,1.006,1.006),new THREE.MeshBasicMaterial({map:crackTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
+crack.visible=false;scene.add(crack);
+const mItem=new THREE.MeshBasicMaterial({map:tex,alphaTest:.5}),IG={},ENT=[],MOBS=[],MM={};
+function itemGeo(t){if(IG[t])return IG[t];const g=new THREE.BoxGeometry(1,1,1),uv=g.attributes.uv,q=TF[t];
+  for(let f=0;f<6;f++){const tile=f===2?q[0]:f===3?q[1]:(f===4&&q[3]!=null)?q[3]:q[2];for(let k=0;k<4;k++){const i=f*4+k;uv.setX(i,(tile+uv.getX(i)*.96+.02)/64);}}
+  return IG[t]=g;}
+function spawnItem(t,x,y,z,part){
+  const m=new THREE.Mesh(itemGeo(t),mItem);m.scale.setScalar(part?.12:.28);scene.add(m);
+  ENT.push({m,x,y,z,vx:(Math.random()-.5)*(part?3:2),vy:part?2+Math.random()*2:3,vz:(Math.random()-.5)*(part?3:2),t,age:0,part});
+}
+function gain(t){COUNT[t]=(COUNT[t]||0)+1;if(!HB.includes(t)){const s=HB.findIndex(b=>!b||!(COUNT[b]>0));if(s>=0)HB[s]=t;}drawBar();dirty=true;}
+function updateEnts(dt){
+  for(let i=ENT.length-1;i>=0;i--){
+    const e=ENT[i];e.age+=dt;e.vy-=22*dt;
+    const nx=e.x+e.vx*dt;if(!solid(Math.floor(nx),Math.floor(e.y),Math.floor(e.z)))e.x=nx;else e.vx*=-.3;
+    const nz=e.z+e.vz*dt;if(!solid(Math.floor(e.x),Math.floor(e.y),Math.floor(nz)))e.z=nz;else e.vz*=-.3;
+    const ny=e.y+e.vy*dt,r=e.part?.06:.14;
+    if(solid(Math.floor(e.x),Math.floor(ny-r),Math.floor(e.z))){e.y=Math.floor(ny-r)+1+r;e.vy=0;e.vx*=.8;e.vz*=.8;}else e.y=ny;
+    e.m.position.set(e.x,e.y+(e.vy===0&&!e.part?Math.sin(e.age*3)*.05+.06:0),e.z);e.m.rotation.y+=dt*(e.part?5:1.5);
+    let pick=false;
+    if(!e.part&&mode==='survival'&&e.age>.4){const dx=P.x-e.x,dy=P.y+.9-e.y,dz=P.z-e.z;if(dx*dx+dy*dy+dz*dz<2.2){pick=true;gain(e.t);}}
+    if(pick||(e.part?e.age>.7:e.age>300)){scene.remove(e.m);ENT.splice(i,1);}
+  }
+}
+function breakBlock(x,y,z){
+  const t=B[idx(x,y,z)];setBlock(x,y,z,0);
+  for(let i=0;i<8;i++)spawnItem(t,x+.15+Math.random()*.7,y+.15+Math.random()*.7,z+.15+Math.random()*.7,true);
+  if(mode==='survival'){const d=DROP[t]!==undefined?DROP[t]:t;if(d)spawnItem(d,x+.5,y+.5,z+.5);}
+}
+const L4=(w,h,x,z,c)=>[[w,h,w,x,h/2,z,c],[w,h,w,-x,h/2,z,c],[w,h,w,x,h/2,-z,c],[w,h,w,-x,h/2,-z,c]];
+const KINDS={
+ pig:{hw:.35,hh:.9,hp:10,sp:1.3,p:[[.5,.5,.9,0,.55,0,0xf0a0a8],[.4,.4,.4,0,.7,.6,0xf0a0a8],[.2,.15,.1,0,.65,.83,0xd08088],...L4(.15,.3,.15,.3,0xe0909a)]},
+ cow:{hw:.45,hh:1.5,hp:10,sp:1.1,p:[[.7,.7,1.1,0,.95,0,0x4a3220],[.5,.5,.45,0,1.15,.75,0x3a2616],[.3,.2,.1,0,1.05,1,0xc8a090],...L4(.2,.6,.25,.4,0x2a1c10)]},
+ sheep:{hw:.4,hh:1.25,hp:8,sp:1.2,p:[[.6,.6,.9,0,.85,0,0xeeeeee],[.4,.4,.4,0,1,.6,0x8a7a6a],...L4(.15,.5,.2,.3,0xcfc8c0)]},
+ zombie:{hw:.3,hh:2,hp:20,sp:2.4,host:1,p:[[.5,.75,.25,0,1.1,0,0x2a9aaa],[.5,.5,.5,0,1.75,0,0x4a8a3a],[.2,.2,.7,.35,1.45,.4,0x4a8a3a],[.2,.2,.7,-.35,1.45,.4,0x4a8a3a],[.25,.75,.25,.13,.375,0,0x3a3a9a],[.25,.75,.25,-.13,.375,0,0x3a3a9a]]}};
+const mmat=h=>MM[h]||(MM[h]=new THREE.MeshBasicMaterial({color:h}));
+function spawnAt(kind,x,z){
+  x=Math.max(2,Math.min(W-2,x));z=Math.max(2,Math.min(W-2,z));const xi=Math.floor(x),zi=Math.floor(z);let y=H-1;
+  while(y>0&&!B[idx(xi,y,zi)])y--;
+  if(B[idx(xi,y,zi)]===10||y<SEA)return false;
+  const K=KINDS[kind],g=new THREE.Group();
+  K.p.forEach(([w,h,d,px,py,pz,c])=>{const me=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mmat(c));me.position.set(px,py,pz);g.add(me);});
+  scene.add(g);MOBS.push({kind,g,x:xi+.5,y:y+1.001,z:zi+.5,vy:0,kx:0,kz:0,yaw:0,t:0,dir:null,hp:K.hp,hw:K.hw,hh:K.hh,sp:K.sp,host:!!K.host,cd:.5,flee:0,gr:false});
+  return true;
+}
+function spawnNear(kind){const a=Math.random()*6.28,r=16+Math.random()*16;spawnAt(kind,P.x+Math.cos(a)*r,P.z+Math.sin(a)*r);}
+function kill(i){scene.remove(MOBS[i].g);MOBS.splice(i,1);}
+function damage(n){
+  if(mode!=='survival')return;P.hp-=n;$('hurt').style.opacity=1;setTimeout(()=>$('hurt').style.opacity=0,120);
+  if(P.hp<=0){P.hp=20;spawn();drawBar();$('name').textContent='死亡しました';return;}drawBar();
+}
+function hurtMob(m,d){
+  m.hp-=d;const dx=m.x-P.x,dz=m.z-P.z,l=Math.hypot(dx,dz)||1;m.kx=dx/l*7;m.kz=dz/l*7;m.vy=5;m.flee=m.host?0:4;
+  if(m.hp<=0){const i=MOBS.indexOf(m);if(i>=0)kill(i);}
+}
+function mobTarget(){
+  const d=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(P.pitch,P.yaw,0,'YXZ'));let best=null,bd=3.8;
+  for(const m of MOBS){const cx=m.x-P.x,cy=m.y+m.hh/2-P.y-1.62,cz=m.z-P.z,t=cx*d.x+cy*d.y+cz*d.z;if(t<0||t>bd)continue;
+    const px=cx-d.x*t,py=cy-d.y*t,pz=cz-d.z*t;if(px*px+py*py+pz*pz<(m.hh*.4)**2+.05){best=m;bd=t;}}
+  return best;
+}
+function updateMobs(dt,k){
+  const night=k<.5;spawnT-=dt;
+  if(spawnT<=0){spawnT=2.5;const nz=MOBS.filter(m=>m.host).length;
+    if(night&&nz<10)spawnNear('zombie');
+    if(MOBS.length-nz<12)spawnNear(['pig','cow','sheep'][Math.random()*3|0]);}
+  for(let i=MOBS.length-1;i>=0;i--){
+    const m=MOBS[i],dx=P.x-m.x,dz=P.z-m.z,dist=Math.hypot(dx,dz)||.01;
+    if((m.host&&k>.9&&Math.random()<dt*.4)||m.y<-10||dist>70){kill(i);continue;}
+    let mx=0,mz=0;
+    if(m.host&&dist<28){mx=dx/dist;mz=dz/dist;m.yaw=Math.atan2(dx,dz);}
+    else{m.t-=dt;if(m.t<=0){m.t=2+Math.random()*4;m.dir=Math.random()<.35?null:Math.random()*6.28;}
+      if(m.flee>0){m.flee-=dt;m.dir=Math.atan2(-dx,-dz);}
+      if(m.dir!=null){mx=Math.sin(m.dir);mz=Math.cos(m.dir);m.yaw=m.dir;}}
+    const sp=m.sp*(m.flee>0?2:1),vx=mx*sp+m.kx,vz=mz*sp+m.kz;m.kx*=.9;m.kz*=.9;
+    const nx=m.x+vx*dt;if(!hit(nx,m.y,m.z,m.hw,m.hh))m.x=nx;else if(m.gr&&(mx||mz))m.vy=8.5;
+    const nz=m.z+vz*dt;if(!hit(m.x,m.y,nz,m.hw,m.hh))m.z=nz;else if(m.gr&&(mx||mz))m.vy=8.5;
+    m.vy-=26*dt;const ny=m.y+m.vy*dt;
+    if(hit(m.x,ny,m.z,m.hw,m.hh)){if(m.vy<0){m.gr=true;m.y=Math.floor(ny)+1.001;}m.vy=0;}else{m.y=ny;m.gr=false;}
+    if(m.host&&dist<1.1&&Math.abs(P.y-m.y)<1.6){if((m.cd-=dt)<=0){m.cd=1;damage(3);}}else m.cd=Math.min(m.cd,.5);
+    m.g.position.set(m.x,m.y,m.z);m.g.rotation.y=m.yaw;
+  }
+}
+
 let last=performance.now(),dayT=.1,infoT=0;
 const DAY=new THREE.Color(0x87ceeb),NIGHT=new THREE.Color(0x070b1e),sky=new THREE.Color(),WATER=new THREE.Color(0x1a3a8a);
 function loop(now){
   requestAnimationFrame(loop);
   const dt=Math.min((now-last)/1000,.05);last=now;
   const locked=document.pointerLockElement===canvas;
-  const wat=blockAt(Math.floor(P.x),Math.floor(P.y+.6),Math.floor(P.z))===10;
+  const wat=blockAt(Math.floor(P.x),Math.floor(P.y+.6),Math.floor(P.z))===10,fly=P.fly&&mode==='creative';
+  if(locked)dayT=(dayT+dt/720)%1;
+  const p=dayT*720,k=p<240?1:p<260?1-(p-240)/20:p<700?0:(p-700)/20;
   if(locked){
     const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0),len=Math.hypot(f,s)||1;
-    let sp=P.fly?11:(keys.ShiftLeft?6.2:4.3);if(wat&&!P.fly)sp*=.55;
+    let sp=fly?11:(keys.ShiftLeft?6.2:4.3);if(wat&&!fly)sp*=.55;
     const vx=(-Math.sin(P.yaw)*f+Math.cos(P.yaw)*s)/len*sp,vz=(-Math.cos(P.yaw)*f-Math.sin(P.yaw)*s)/len*sp;
-    if(P.fly)P.vy=((keys.Space?1:0)-(keys.ShiftLeft?1:0))*8;
-    else if(wat){P.vy=Math.max(P.vy-8*dt,-3);if(keys.Space)P.vy=3;}
-    else{if(keys.Space&&P.ground){P.vy=8.2;P.ground=false;}P.vy-=26*dt;}
+    if(fly)P.vy=((keys.Space?1:0)-(keys.ShiftLeft?1:0))*8;
+    else if(wat){P.vy=Math.max(P.vy-8*dt,-3);if(keys.Space)P.vy=3.2;}
+    else{P.vy-=28*dt;if(keys.Space&&P.ground){P.vy=9;P.ground=false;}}
     const nx=P.x+vx*dt;if(!hit(nx,P.y,P.z))P.x=nx;
     const nz=P.z+vz*dt;if(!hit(P.x,P.y,nz))P.z=nz;
     const ny=P.y+P.vy*dt;
-    if(hit(P.x,ny,P.z)){if(P.vy<0)P.ground=true;P.vy=0;}else{P.y=ny;P.ground=false;}
+    if(hit(P.x,ny,P.z)){
+      if(P.vy<0){const fd=P.fallY-ny;if(!P.ground&&!wat&&!fly&&fd>3)damage(Math.floor(fd-3));P.ground=true;P.y=Math.floor(ny)+1.001;P.fallY=P.y;}
+      P.vy=0;
+    }else{P.y=ny;P.ground=false;P.fallY=(wat||fly)?P.y:Math.max(P.fallY,P.y);}
     if(P.y<-20)spawn();
+    updateMobs(dt,k);updateEnts(dt);
+    if(mode==='survival'&&P.hp<20&&(regen+=dt)>4){regen=0;P.hp++;drawBar();}
   }
-  // mining
   const r=locked?ray():null;
-  sel.visible=!!r;
+  sel.visible=!!r;crack.visible=false;cool-=dt;
   if(r){
     sel.position.set(r.x+.5,r.y+.5,r.z+.5);
     if(!tgt||tgt.x!==r.x||tgt.y!==r.y||tgt.z!==r.z){tgt=r;prog=0;}
-    if(mining){
-      prog+=dt/((HARD[B[idx(r.x,r.y,r.z)]]??1)*.45+.05);
-      if(prog>=1){setBlock(r.x,r.y,r.z,0);prog=0;}
+    if(mining&&cool<=0){
+      if(mode==='creative'){breakBlock(r.x,r.y,r.z);cool=.22;}
+      else{
+        prog+=dt/((HARD[B[idx(r.x,r.y,r.z)]]??1)*1.5+.05);
+        if(prog>=1){breakBlock(r.x,r.y,r.z);prog=0;cool=.25;}
+        else{crack.visible=true;crack.position.copy(sel.position);crackTex.offset.x=Math.min(9,Math.floor(prog*10))*.1;}
+      }
     }
   }
-  $('prog').style.display=(mining&&r)?'block':'none';
-  $('prog').firstChild.style.width=Math.min(prog,1)*100+'%';
-  // day / night
-  dayT=(dayT+dt/300)%1;
-  const k=Math.max(0,Math.min(1,Math.sin(dayT*Math.PI*2)*1.6+.55));
-  sky.copy(NIGHT).lerp(DAY,k);
+  $('prog').style.display='none';
   const under=blockAt(Math.floor(P.x),Math.floor(P.y+1.62),Math.floor(P.z))===10;
+  sky.copy(NIGHT).lerp(DAY,k);
   if(under){sky.copy(WATER).multiplyScalar(.3+.7*k);scene.fog.near=1;scene.fog.far=18;}else{scene.fog.near=40;scene.fog.far=100;}
   scene.background=sky;scene.fog.color.copy(sky);
-  mOpq.color.setScalar(.28+.72*k);mWat.color.setScalar(.28+.72*k);
+  const lt=.28+.72*k;mOpq.color.setScalar(lt);mWat.color.setScalar(lt);mItem.color.setScalar(lt);
+  for(const h in MM)MM[h].color.setHex(+h).multiplyScalar(lt);
   cam.position.set(P.x,P.y+1.62,P.z);cam.rotation.set(P.pitch,P.yaw,0,'YXZ');
-  if((infoT+=dt)>.3){infoT=0;$('info').textContent=`XYZ ${P.x.toFixed(1)} ${P.y.toFixed(1)} ${P.z.toFixed(1)} ${P.fly?'[飛行]':''} ${k>.5?'昼':'夜'}`;}
+  if((infoT+=dt)>.3){infoT=0;$('info').textContent=`${mode==='survival'?'サバイバル':'クリエイティブ'} XYZ ${P.x.toFixed(1)} ${P.y.toFixed(1)} ${P.z.toFixed(1)} ${fly?'[飛行]':''} ${k>.5?'昼':'夜'}`;}
   renderer.render(scene,cam);
 }
 function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}
@@ -313,7 +416,7 @@ addEventListener('resize',resize);
 
 // ---------- save / load ----------
 async function save(){
-  const data={edits,pos:[P.x,P.y,P.z],yaw:P.yaw,t:dayT,hb:HB};
+  const data={edits,pos:[P.x,P.y,P.z],yaw:P.yaw,t:dayT,hb:HB,mode,cnt:COUNT,hp:P.hp};
   if(!user){try{localStorage.setItem('vc_guest',JSON.stringify(data));dirty=false;setStatus('ブラウザに保存 ✓(ゲスト)');}catch(e){}$('msg').textContent='ログインするとクラウドに保存できます';return;}
   try{setStatus('保存中...');await db.collection('worlds').doc(user.uid).set({...data,updated:firebase.firestore.FieldValue.serverTimestamp()});dirty=false;setStatus('クラウド保存済み ✓');}
   catch(e){setStatus('保存失敗');$('msg').textContent='保存エラー: '+e.message;}
@@ -326,15 +429,17 @@ async function load(){
   }catch(e){$('msg').textContent='ロードエラー: '+e.message;}
   if(v){
     edits=v.edits||{};for(const k in edits)B[+k]=edits[k];
-    if(v.pos){[P.x,P.y,P.z]=v.pos;P.yaw=v.yaw||0;}if(v.t!=null)dayT=v.t;if(v.hb&&v.hb.length===10){HB=v.hb;drawBar();}
+    if(v.pos){[P.x,P.y,P.z]=v.pos;P.yaw=v.yaw||0;}if(v.t!=null)dayT=v.t;if(v.hb&&v.hb.length===10)HB=v.hb;if(v.cnt)COUNT=v.cnt;if(v.mode)setMode(v.mode);if(v.hp)P.hp=v.hp;drawBar();
     setStatus('ロード完了 ✓');
   }else setStatus('新しいワールド');
-  buildAll();
+  buildAll();MOBS.splice(0).forEach(m=>scene.remove(m.g));for(let i=0;i<80&&MOBS.length<12;i++)spawnAt(['pig','cow','sheep'][i%3],4+Math.random()*(W-8),4+Math.random()*(W-8));
 }
 $('login').onclick=()=>!FB_OK?($('msg').textContent='Firebaseを読み込めません。GitHub Pages等の公開URLで開いてください'):auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>$('msg').textContent='ログイン失敗: '+e.message);
 $('logout').onclick=()=>auth&&auth.signOut();
 $('save').onclick=save;
-$('play').onclick=()=>canvas.requestPointerLock();
+$('play').onclick=()=>{$('play').blur();canvas.requestPointerLock();};
+function setMode(m){mode=m;P.fly=false;P.hp=20;$('mC').classList.toggle('on',m==='creative');$('mS').classList.toggle('on',m==='survival');drawBar();dirty=true;}
+$('mC').onclick=()=>setMode('creative');$('mS').onclick=()=>setMode('survival');
 document.addEventListener('pointerlockchange',()=>{
   const l=document.pointerLockElement===canvas;$('menu').style.display=(l||inv)?'none':'flex';
   if(!l){mining=false;if(dirty)save();}
